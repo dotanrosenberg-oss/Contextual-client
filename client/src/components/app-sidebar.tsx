@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquare, Search, Settings } from "lucide-react";
+import { MessageSquare, Search, Settings, AlertCircle } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,10 +12,11 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { CustomerListItem } from "./CustomerListItem";
+import { SyncButton } from "./SyncButton";
 import type { Customer } from "@shared/schema";
 
 interface AppSidebarProps {
@@ -24,6 +25,8 @@ interface AppSidebarProps {
   onSelectCustomer?: (customerId: string) => void;
   connectionStatus?: "connected" | "disconnected" | "connecting";
   onSettingsClick?: () => void;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 export function AppSidebar({
@@ -32,6 +35,8 @@ export function AppSidebar({
   onSelectCustomer,
   connectionStatus = "disconnected",
   onSettingsClick,
+  isLoading = false,
+  error = null,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -70,7 +75,25 @@ export function AppSidebar({
           <SidebarGroupContent className="px-2">
             <ScrollArea className="h-[calc(100vh-220px)]">
               <SidebarMenu>
-                {filteredCustomers.length === 0 ? (
+                {isLoading ? (
+                  <div className="space-y-2 p-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center gap-3 p-2">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : error ? (
+                  <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
+                    <AlertCircle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm font-medium text-destructive">Failed to load chats</p>
+                    <p className="text-xs text-muted-foreground">{error.message}</p>
+                  </div>
+                ) : filteredCustomers.length === 0 ? (
                   <div className="text-center py-8 text-sm text-muted-foreground">
                     {searchQuery ? "No chats found" : "No conversations yet"}
                   </div>
@@ -96,7 +119,8 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-2">
+      <SidebarFooter className="p-2 space-y-2">
+        <SyncButton disabled={connectionStatus !== "connected"} />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

@@ -4,13 +4,19 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { ConversationSummaryWidget } from "./widgets/ConversationSummaryWidget";
+import { ContactInsightsWidget } from "./widgets/ContactInsightsWidget";
+import { SharedGroupsWidget } from "./widgets/SharedGroupsWidget";
+import { SocialIntegrationWidget } from "./widgets/SocialIntegrationWidget";
+import type { Message } from "@shared/schema";
 
 interface CopilotPanelProps {
-  children?: React.ReactNode;
+  selectedCustomerId: string | null;
+  messages: Message[];
   className?: string;
 }
 
-export function CopilotPanel({ children, className }: CopilotPanelProps) {
+export function CopilotPanel({ selectedCustomerId, messages, className }: CopilotPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   if (isCollapsed) {
@@ -69,25 +75,31 @@ export function CopilotPanel({ children, className }: CopilotPanelProps) {
           <TabsTrigger value="insights" data-testid="tab-insights">
             Insights
           </TabsTrigger>
-          <TabsTrigger value="actions" data-testid="tab-actions">
-            Actions
+          <TabsTrigger value="social" data-testid="tab-social">
+            Social
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="insights" className="flex-1 m-0">
           <ScrollArea className="h-full">
             <div className="p-3 space-y-3">
-              {children}
+              <ConversationSummaryWidget 
+                customerId={selectedCustomerId} 
+                messages={messages} 
+              />
+              <ContactInsightsWidget 
+                customerId={selectedCustomerId} 
+                messages={messages} 
+              />
+              <SharedGroupsWidget customerId={selectedCustomerId} />
             </div>
           </ScrollArea>
         </TabsContent>
         
-        <TabsContent value="actions" className="flex-1 m-0">
+        <TabsContent value="social" className="flex-1 m-0">
           <ScrollArea className="h-full">
             <div className="p-3 space-y-3">
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Quick actions coming soon
-              </p>
+              <SocialIntegrationWidget customerId={selectedCustomerId} />
             </div>
           </ScrollArea>
         </TabsContent>
