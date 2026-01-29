@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { MessageSquare, Settings, Server, Key } from "lucide-react";
+import { Settings, Server, Key } from "lucide-react";
+import logoImage from "@assets/Gemini_Generated_Image_f014s7f014s7f014_1769729881969.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsDialog } from "./SettingsDialog";
@@ -12,11 +13,12 @@ export function WelcomeScreen() {
       <Card className="w-full max-w-lg" data-testid="card-welcome">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10">
-              <MessageSquare className="h-8 w-8 text-primary" />
-            </div>
+            <img src={logoImage} alt="Contextify" className="h-20 w-20 rounded-xl" />
           </div>
-          <CardTitle className="text-2xl">Welcome to Contextful</CardTitle>
+          <CardTitle className="text-2xl">Welcome to Contextify</CardTitle>
+          <CardDescription className="text-sm uppercase tracking-wider text-muted-foreground mb-2">
+            Intelligent Unification
+          </CardDescription>
           <CardDescription className="text-base">
             Your AI-powered WhatsApp communication assistant. Connect your WhatsApp server to get started.
           </CardDescription>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { MessageSquare, Search, Settings, AlertCircle } from "lucide-react";
+import { Search, Settings, AlertCircle } from "lucide-react";
+import logoImage from "@assets/Gemini_Generated_Image_f014s7f014s7f014_1769729881969.png";
 import {
   Sidebar,
   SidebarContent,
@@ -47,9 +48,12 @@ export function AppSidebar({
   return (
     <Sidebar data-testid="app-sidebar">
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold">Contextful</span>
+        <div className="flex items-center gap-3">
+          <img src={logoImage} alt="Contextify" className="h-10 w-10 rounded-lg" />
+          <div className="flex flex-col">
+            <span className="text-lg font-bold">Contextify</span>
+            <span className="text-xs text-muted-foreground">Intelligent Unification</span>
+          </div>
         </div>
         <ConnectionStatus status={connectionStatus} className="mt-2" />
       </SidebarHeader>

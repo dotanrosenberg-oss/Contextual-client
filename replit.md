@@ -1,8 +1,10 @@
-# Contextful - WhatsApp Client with AI Copilot
+# Contextify - WhatsApp Client with AI Copilot
 
 ## Overview
 
-Contextful is a WhatsApp client with an AI-powered copilot panel that connects to a dedicated WhatsApp server. The platform provides contextual information including conversation summaries, key topics, action items, and social media integrations. Designed for users with many contacts who need context at a glance without manually catching up on conversations.
+Contextify is a WhatsApp client with an AI-powered copilot panel that connects to a dedicated WhatsApp server. The platform provides contextual information including conversation summaries, key topics, action items, and social media integrations. Designed for users with many contacts who need context at a glance without manually catching up on conversations.
+
+Tagline: "Intelligent Unification"
 
 ## Project Architecture
 
@@ -81,9 +83,11 @@ Contextful is a WhatsApp client with an AI-powered copilot panel that connects t
 ## Design System
 
 ### Colors
-- Primary: Teal/Emerald gradient (professional WhatsApp-inspired)
+- Primary: Purple/Violet (hue ~270) - futuristic, professional
+- Accent: Cyan/Teal (hue ~185) - for highlights and secondary actions
+- Deep dark purple background for dark mode
 - Proper contrast for accessibility
-- Full dark mode support
+- Full dark mode support (optimized for the brand)
 
 ### Components
 All components use Shadcn UI primitives with consistent styling:
@@ -96,8 +100,9 @@ All components use Shadcn UI primitives with consistent styling:
 - AI-powered conversation insights with OpenAI
 - Real-time WebSocket updates
 - Settings management and onboarding flow
+- Rebranded from "Contextful" to "Contextify" with new logo and color scheme
 
 ## User Preferences
 - Professional, clean interface
-- Teal/emerald color scheme
+- Purple/cyan color scheme matching the Contextify brand
 - Dark mode enabled by default

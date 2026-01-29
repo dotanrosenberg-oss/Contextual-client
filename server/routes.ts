@@ -172,7 +172,7 @@ export async function registerRoutes(
     connectedClients.add(ws);
     console.log("Client connected to WebSocket (authenticated)");
 
-    ws.send(JSON.stringify({ type: "connected", data: { message: "Connected to Contextful server" } }));
+    ws.send(JSON.stringify({ type: "connected", data: { message: "Connected to Contextify server" } }));
 
     ws.on("close", () => {
       connectedClients.delete(ws);
