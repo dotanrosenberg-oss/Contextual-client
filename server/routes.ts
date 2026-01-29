@@ -1,16 +1,432 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
+import { IncomingMessage } from "http";
+import OpenAI from "openai";
 import { storage } from "./storage";
+import { z } from "zod";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+const sendMessageSchema = z.object({
+  message: z.string().min(1, "Message cannot be empty"),
+});
+
+const createGroupSchema = z.object({
+  name: z.string().min(1, "Group name cannot be empty"),
+  participants: z.array(z.string()).min(1, "At least one participant required"),
+});
+
+const checkNumberSchema = z.object({
+  phoneNumber: z.string().min(1, "Phone number cannot be empty"),
+});
+
+const limitQuerySchema = z.coerce.number().int().min(1).max(500).default(100);
+
+async function getWaSettings() {
+  const settings = await storage.getSettings();
+  if (!settings) {
+    return null;
+  }
+  return {
+    baseUrl: settings.waServerUrl,
+    apiKey: settings.waApiKey,
+  };
+}
+
+async function makeWaRequest(
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<{ status: number; data: unknown }> {
+  const settings = await getWaSettings();
+  if (!settings) {
+    return { status: 503, data: { error: "SETTINGS_NOT_CONFIGURED", message: "WhatsApp server settings not configured" } };
+  }
+
+  const url = `${settings.baseUrl}${path}`;
+  const headers: Record<string, string> = {
+    "X-API-Key": settings.apiKey,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const data = await response.json().catch(() => ({}));
+    return { status: response.status, data };
+  } catch (error) {
+    console.error("WhatsApp server request failed:", error);
+    return { status: 503, data: { error: "CONNECTION_FAILED", message: "Failed to connect to WhatsApp server" } };
+  }
+}
+
+let waWebSocket: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let isConnecting = false;
+const connectedClients = new Set<WebSocket>();
+
+function setupWaWebSocket() {
+  if (isConnecting) return;
+  
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  
+  isConnecting = true;
+  
+  getWaSettings().then((settings) => {
+    if (!settings) {
+      console.log("No WhatsApp settings configured, skipping WebSocket connection");
+      isConnecting = false;
+      return;
+    }
+
+    const wsUrl = settings.baseUrl.replace(/^http/, "ws") + `/ws?apiKey=${encodeURIComponent(settings.apiKey)}`;
+    
+    if (waWebSocket) {
+      waWebSocket.close();
+      waWebSocket = null;
+    }
+
+    try {
+      waWebSocket = new WebSocket(wsUrl);
+
+      waWebSocket.on("open", () => {
+        console.log("Connected to WhatsApp server WebSocket");
+        isConnecting = false;
+        broadcastToClients({ type: "wa_connected", data: { message: "Connected to WhatsApp server" } });
+      });
+
+      waWebSocket.on("message", (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          broadcastToClients(message);
+        } catch (e) {
+          console.error("Failed to parse WA WebSocket message:", e);
+        }
+      });
+
+      waWebSocket.on("close", () => {
+        console.log("WhatsApp server WebSocket closed");
+        waWebSocket = null;
+        isConnecting = false;
+        broadcastToClients({ type: "wa_disconnected", data: { message: "Disconnected from WhatsApp server" } });
+        reconnectTimer = setTimeout(setupWaWebSocket, 5000);
+      });
+
+      waWebSocket.on("error", (error) => {
+        console.error("WhatsApp server WebSocket error:", error);
+        isConnecting = false;
+      });
+    } catch (error) {
+      console.error("Failed to create WhatsApp WebSocket connection:", error);
+      isConnecting = false;
+    }
+  }).catch(() => {
+    isConnecting = false;
+  });
+}
+
+function broadcastToClients(message: unknown) {
+  const messageStr = JSON.stringify(message);
+  connectedClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(messageStr);
+    }
+  });
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
+    const url = new URL(req.url || "", `http://${req.headers.host}`);
+    const clientApiKey = url.searchParams.get("apiKey");
+    
+    const settings = await getWaSettings();
+    
+    if (!settings) {
+      ws.send(JSON.stringify({ type: "error", data: { code: "SETTINGS_NOT_CONFIGURED", message: "Server not configured" } }));
+      ws.close(4001, "Server not configured");
+      return;
+    }
+    
+    if (!clientApiKey || clientApiKey !== settings.apiKey) {
+      ws.send(JSON.stringify({ type: "error", data: { code: "UNAUTHORIZED", message: "Invalid or missing API key" } }));
+      ws.close(4003, "Unauthorized");
+      return;
+    }
+    
+    connectedClients.add(ws);
+    console.log("Client connected to WebSocket (authenticated)");
+
+    ws.send(JSON.stringify({ type: "connected", data: { message: "Connected to Contextful server" } }));
+
+    ws.on("close", () => {
+      connectedClients.delete(ws);
+      console.log("Client disconnected from WebSocket");
+    });
+
+    ws.on("error", (error) => {
+      console.error("Client WebSocket error:", error);
+      connectedClients.delete(ws);
+    });
+  });
+
+  setupWaWebSocket();
+
+  // Settings routes
+  app.get("/api/settings", async (_req: Request, res: Response) => {
+    try {
+      const settings = await storage.getSettings();
+      if (!settings) {
+        return res.json({ configured: false });
+      }
+
+      const maskedApiKey = settings.waApiKey
+        ? settings.waApiKey.slice(0, 4) + "****" + settings.waApiKey.slice(-4)
+        : "";
+
+      res.json({
+        configured: true,
+        baseUrl: settings.waServerUrl,
+        apiKey: maskedApiKey,
+        updatedAt: settings.updatedAt,
+      });
+    } catch (error) {
+      console.error("Failed to get settings:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve settings" });
+    }
+  });
+
+  const updateSettingsSchema = z.object({
+    baseUrl: z.string().url(),
+    apiKey: z.string().min(1),
+  });
+
+  app.post("/api/settings", async (req: Request, res: Response) => {
+    try {
+      const parsed = updateSettingsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.message });
+      }
+
+      const { baseUrl, apiKey } = parsed.data;
+
+      const settings = await storage.saveSettings({
+        waServerUrl: baseUrl.replace(/\/$/, ""),
+        waApiKey: apiKey,
+      });
+
+      setupWaWebSocket();
+
+      res.json({
+        success: true,
+        configured: true,
+        baseUrl: settings.waServerUrl,
+        updatedAt: settings.updatedAt,
+      });
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to save settings" });
+    }
+  });
+
+  // WhatsApp proxy routes
+  app.get("/api/wa/status", async (_req: Request, res: Response) => {
+    const { status, data } = await makeWaRequest("GET", "/api/status");
+    res.status(status).json(data);
+  });
+
+  app.get("/api/wa/customers", async (_req: Request, res: Response) => {
+    const { status, data } = await makeWaRequest("GET", "/api/customers");
+    res.status(status).json(data);
+  });
+
+  app.get("/api/wa/customers/:id", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status, data } = await makeWaRequest("GET", `/api/customers/${encodeURIComponent(id)}`);
+    res.status(status).json(data);
+  });
+
+  app.delete("/api/wa/customers/:id", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status, data } = await makeWaRequest("DELETE", `/api/customers/${encodeURIComponent(id)}`);
+    res.status(status).json(data);
+  });
+
+  app.post("/api/wa/customers/sync", async (_req: Request, res: Response) => {
+    const { status, data } = await makeWaRequest("POST", "/api/customers/sync");
+    res.status(status).json(data);
+  });
+
+  app.get("/api/wa/customers/:id/messages", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const limitResult = limitQuerySchema.safeParse(req.query.limit);
+    const limit = limitResult.success ? limitResult.data : 100;
+    const { status, data } = await makeWaRequest("GET", `/api/customers/${encodeURIComponent(id)}/messages?limit=${limit}`);
+    res.status(status).json(data);
+  });
+
+  app.post("/api/wa/customers/:id/messages", async (req: Request, res: Response) => {
+    const parsed = sendMessageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+    }
+    const { id } = req.params;
+    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, parsed.data);
+    res.status(status).json(data);
+  });
+
+  app.post("/api/wa/groups/create", async (req: Request, res: Response) => {
+    const parsed = createGroupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+    }
+    const { status, data } = await makeWaRequest("POST", "/api/groups/create", parsed.data);
+    res.status(status).json(data);
+  });
+
+  app.post("/api/wa/diagnostics/check-number", async (req: Request, res: Response) => {
+    const parsed = checkNumberSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+    }
+    const { status, data } = await makeWaRequest("POST", "/api/diagnostics/check-number", parsed.data);
+    res.status(status).json(data);
+  });
+
+  // AI Insights route
+  const generateInsightsSchema = z.object({
+    customerId: z.string(),
+    messages: z.array(z.object({
+      id: z.string(),
+      body: z.string(),
+      fromName: z.string().nullable().optional(),
+      fromPhone: z.string().nullable().optional(),
+      timestamp: z.string().or(z.date()),
+      isFromMe: z.boolean().optional(),
+    })),
+  });
+
+  app.post("/api/insights/generate", async (req: Request, res: Response) => {
+    try {
+      const parsed = generateInsightsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.message });
+      }
+
+      const { customerId, messages } = parsed.data;
+
+      if (messages.length === 0) {
+        return res.status(400).json({ error: "NO_MESSAGES", message: "No messages provided for analysis" });
+      }
+
+      const conversationText = messages
+        .map((m) => {
+          const sender = m.isFromMe ? "Me" : (m.fromName || m.fromPhone || "Unknown");
+          return `[${sender}]: ${m.body}`;
+        })
+        .join("\n");
+
+      const systemPrompt = `You are an AI assistant that analyzes WhatsApp conversations and provides actionable insights. Analyze the conversation and provide:
+
+1. A brief summary (2-3 sentences) of the conversation
+2. Key topics discussed (list of 3-5 topics)
+3. Action items or follow-ups if any (list of items)
+4. Relationship strength score (1-10, where 10 is very strong engagement)
+5. Recommendations for the user
+
+Respond in JSON format with the following structure:
+{
+  "summary": "string",
+  "keyTopics": ["topic1", "topic2", ...],
+  "actionItems": ["item1", "item2", ...],
+  "relationshipStrength": number,
+  "recommendations": ["recommendation1", ...]
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Analyze this conversation:\n\n${conversationText}` },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1000,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("No response from AI");
+      }
+
+      let insights;
+      try {
+        insights = JSON.parse(content);
+      } catch {
+        throw new Error("Failed to parse AI response");
+      }
+
+      const insightDataSchema = z.object({
+        summary: z.string().default("No summary available"),
+        keyTopics: z.array(z.string()).default([]),
+        actionItems: z.array(z.string()).default([]),
+        relationshipStrength: z.number().min(1).max(10).default(5),
+        recommendations: z.array(z.string()).default([]),
+      });
+
+      const validatedInsights = insightDataSchema.parse(insights);
+
+      const savedInsight = await storage.saveInsight({
+        customerId,
+        summary: validatedInsights.summary,
+        keyTopics: validatedInsights.keyTopics,
+        actionItems: validatedInsights.actionItems,
+        relationshipStrength: validatedInsights.relationshipStrength,
+        lastInteraction: new Date(),
+      });
+
+      res.json({
+        success: true,
+        insight: {
+          ...savedInsight,
+          recommendations: validatedInsights.recommendations,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to generate insights:", error);
+      res.status(500).json({ error: "AI_ERROR", message: "Failed to generate insights" });
+    }
+  });
+
+  app.get("/api/insights/:customerId", async (req: Request, res: Response) => {
+    try {
+      const { customerId } = req.params;
+      const insight = await storage.getInsight(customerId);
+      
+      if (!insight) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "No insights found for this customer" });
+      }
+
+      res.json(insight);
+    } catch (error) {
+      console.error("Failed to get insight:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve insight" });
+    }
+  });
 
   return httpServer;
 }
