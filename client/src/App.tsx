@@ -116,7 +116,9 @@ function ChatView() {
                   <div>
                     <h2 className="font-medium text-sm">{selectedCustomer.name}</h2>
                     <p className="text-xs text-muted-foreground">
-                      {serviceConnectionStatus === "connected" ? "Online" : "Offline"}
+                      {selectedCustomer.participantCount 
+                        ? `${selectedCustomer.participantCount} members` 
+                        : serviceConnectionStatus === "connected" ? "Online" : "Offline"}
                     </p>
                   </div>
                 </>
