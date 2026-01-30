@@ -206,7 +206,7 @@ function ChatView() {
             <MessageInput
               onSend={handleSendMessage}
               isLoading={sendMessageMutation.isPending}
-              disabled={!selectedCustomer || connectionStatus !== "connected"}
+              disabled={!selectedCustomer || serviceConnectionStatus !== "connected"}
             />
           )}
         </div>
