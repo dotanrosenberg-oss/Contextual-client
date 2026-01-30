@@ -20,8 +20,9 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ServiceUnavailableState } from "./components/ServiceUnavailableState";
 import { WhatsAppNotLinkedState } from "./components/WhatsAppNotLinkedState";
-import { MessageSquare, AlertCircle, Settings } from "lucide-react";
-import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings } from "./lib/api";
+import { MessageSquare, AlertCircle, Settings, Download, Loader2 } from "lucide-react";
+import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "./hooks/useWebSocket";
 import NotFound from "@/pages/not-found";
 
@@ -29,6 +30,7 @@ function ChatView() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const queryClientInstance = useQueryClient();
+  const { toast } = useToast();
 
   const { data: customers = [], isLoading: customersLoading, error: customersError } = useCustomers();
   const { data: messages = [], isLoading: messagesLoading, error: messagesError } = useMessages(selectedCustomerId);
@@ -36,6 +38,7 @@ function ChatView() {
   const { data: settings, isLoading: settingsLoading } = useSettings();
   
   const sendMessageMutation = useSendMessage();
+  const importHistoryMutation = useImportHistory();
 
   const isServiceConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
   const isServerReachable = !serverStatusError && serverStatus !== undefined;
@@ -88,6 +91,24 @@ function ChatView() {
     }
   };
 
+  const handleImportHistory = async () => {
+    if (!selectedCustomerId) return;
+    
+    try {
+      const result = await importHistoryMutation.mutateAsync({ customerId: selectedCustomerId, limit: 200 });
+      toast({
+        title: "Messages imported",
+        description: `Successfully imported ${result.count} messages from WhatsApp`,
+      });
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const serverConnectionStatus = getServerStatus();
   const serviceConnectionStatus = getServiceStatus();
 
@@ -127,6 +148,22 @@ function ChatView() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              {selectedCustomer && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleImportHistory}
+                  disabled={importHistoryMutation.isPending || serviceConnectionStatus !== "connected"}
+                  title="Import message history from WhatsApp"
+                  data-testid="button-import-history"
+                >
+                  {importHistoryMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

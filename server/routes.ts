@@ -317,6 +317,16 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
+  app.get("/api/wa/whatsapp/messages/:chatId", async (req: Request, res: Response) => {
+    const { chatId } = req.params;
+    const limitResult = limitQuerySchema.safeParse(req.query.limit);
+    const limit = limitResult.success ? limitResult.data : 100;
+    
+    const path = `/api/whatsapp/messages/${encodeURIComponent(chatId)}?limit=${limit}`;
+    const { status, data } = await makeWaRequest("GET", path);
+    res.status(status).json(data);
+  });
+
   // AI Insights route
   const generateInsightsSchema = z.object({
     customerId: z.string(),

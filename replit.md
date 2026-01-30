@@ -69,9 +69,10 @@ Tagline: "Intelligent Unification"
 - `GET /api/wa/status` - Server status
 - `GET /api/wa/customers` - List all customers
 - `GET /api/wa/customers/:id` - Get customer
-- `GET /api/wa/customers/:id/messages` - Get messages
+- `GET /api/wa/customers/:id/messages` - Get messages (local database)
 - `POST /api/wa/customers/:id/messages` - Send message
 - `POST /api/wa/customers/sync` - Sync customers from WhatsApp
+- `GET /api/wa/whatsapp/messages/:chatId` - Import historical messages from WhatsApp servers
 
 ### AI Insights
 - `POST /api/insights/generate` - Generate AI insights for a customer
@@ -104,6 +105,8 @@ All components use Shadcn UI primitives with consistent styling:
 - Added client-side message caching with IndexedDB for persistent state
 - Incremental message sync - only fetches new messages since last timestamp
 - WebSocket handler caches incoming messages in real-time
+- Import history button in chat header to fetch historical messages from WhatsApp
+- Show last message preview when message history is not yet available
 
 ## User Preferences
 - Professional, clean interface

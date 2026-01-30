@@ -294,3 +294,61 @@ export function useSyncCustomers() {
     },
   });
 }
+
+interface ImportHistoryResponse {
+  success: boolean;
+  chatId: string;
+  count: number;
+  messages: Message[];
+}
+
+export function useImportHistory() {
+  const qc = useQueryClient();
+  
+  return useMutation<ImportHistoryResponse, Error, { customerId: string; limit?: number }>({
+    mutationFn: async ({ customerId, limit = 200 }) => {
+      const res = await fetch(
+        `/api/wa/whatsapp/messages/${encodeURIComponent(customerId)}?limit=${limit}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
+    onSuccess: async (response, variables) => {
+      if (response.messages && response.messages.length > 0) {
+        await cacheMessages(response.messages);
+        
+        const latestImportedTimestamp = response.messages.reduce((max, msg) => {
+          const ts = new Date(msg.timestamp).getTime();
+          return ts > max ? ts : max;
+        }, 0);
+        
+        if (latestImportedTimestamp > 0) {
+          const syncKey = `messages-${variables.customerId}`;
+          const existingMeta = await getSyncMeta(syncKey).catch(() => null);
+          const existingTimestamp = existingMeta?.lastSyncTimestamp || 0;
+          const newTimestamp = Math.max(existingTimestamp, latestImportedTimestamp);
+          
+          await updateSyncMeta({
+            key: syncKey,
+            lastSyncTimestamp: newTimestamp,
+          }).catch(() => {});
+        }
+        
+        qc.setQueryData<Message[]>(
+          ["/api/wa/customers", variables.customerId, "messages"],
+          (old) => {
+            const existingIds = new Set(old?.map((m) => m.id) || []);
+            const newMsgs = response.messages.filter((m) => !existingIds.has(m.id));
+            const all = [...(old || []), ...newMsgs];
+            all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            return all;
+          }
+        );
+      }
+    },
+  });
+}
