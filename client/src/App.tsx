@@ -176,9 +176,25 @@ function ChatView() {
                 <ScrollArea className="h-full">
                   <div className="p-4 space-y-3">
                     {messages.length === 0 ? (
-                      <div className="text-center py-8 text-sm text-muted-foreground">
-                        No messages yet. Start the conversation!
-                      </div>
+                      selectedCustomer?.lastMessage ? (
+                        <div className="flex flex-col items-center py-8 gap-4">
+                          <div className="max-w-[85%] p-3 rounded-lg bg-muted text-foreground">
+                            <p className="text-sm">{selectedCustomer.lastMessage}</p>
+                            {selectedCustomer.lastMessageTime && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(selectedCustomer.lastMessageTime).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center px-4">
+                            Historical messages are syncing. New messages will appear here.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No messages yet. Start the conversation!
+                        </div>
+                      )
                     ) : (
                       messages.map((message) => (
                         <MessageBubble
