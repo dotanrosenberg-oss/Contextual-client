@@ -1,10 +1,12 @@
 import { cn } from "@/lib/utils";
+import { Server, Smartphone } from "lucide-react";
 
 type ConnectionState = "connected" | "disconnected" | "connecting";
 
 interface ConnectionStatusProps {
-  status: ConnectionState;
-  showLabel?: boolean;
+  serverStatus: ConnectionState;
+  serviceStatus: ConnectionState;
+  showLabels?: boolean;
   className?: string;
 }
 
@@ -26,19 +28,12 @@ const statusConfig = {
   },
 };
 
-export function ConnectionStatus({
-  status,
-  showLabel = true,
-  className,
-}: ConnectionStatusProps) {
+function StatusIndicator({ status, label }: { status: ConnectionState; label: string }) {
   const config = statusConfig[status];
-
+  
   return (
-    <div
-      className={cn("flex items-center gap-2", className)}
-      data-testid={`connection-status-${status}`}
-    >
-      <span className="relative flex h-2.5 w-2.5">
+    <div className="flex items-center gap-1.5" data-testid={`status-${label.toLowerCase()}-${status}`}>
+      <span className="relative flex h-2 w-2">
         {config.pulse && (
           <span
             className={cn(
@@ -49,14 +44,35 @@ export function ConnectionStatus({
         )}
         <span
           className={cn(
-            "relative inline-flex h-2.5 w-2.5 rounded-full",
+            "relative inline-flex h-2 w-2 rounded-full",
             config.color
           )}
         />
       </span>
-      {showLabel && (
-        <span className="text-xs text-muted-foreground">{config.label}</span>
-      )}
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+export function ConnectionStatus({
+  serverStatus,
+  serviceStatus,
+  showLabels = true,
+  className,
+}: ConnectionStatusProps) {
+  return (
+    <div
+      className={cn("flex items-center gap-4", className)}
+      data-testid="connection-status"
+    >
+      <div className="flex items-center gap-1.5">
+        <Server className="h-3.5 w-3.5 text-muted-foreground" />
+        <StatusIndicator status={serverStatus} label="Server" />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+        <StatusIndicator status={serviceStatus} label="WhatsApp" />
+      </div>
     </div>
   );
 }

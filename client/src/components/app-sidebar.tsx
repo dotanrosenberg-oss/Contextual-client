@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Settings, AlertCircle } from "lucide-react";
+import { Search, Settings, AlertCircle, Smartphone } from "lucide-react";
 import logoImage from "@assets/Gemini_Generated_Image_f014s7f014s7f014_1769729881969.png";
 import {
   Sidebar,
@@ -24,20 +24,24 @@ interface AppSidebarProps {
   customers?: Customer[];
   selectedCustomerId?: string | null;
   onSelectCustomer?: (customerId: string) => void;
-  connectionStatus?: "connected" | "disconnected" | "connecting";
+  serverStatus?: "connected" | "disconnected" | "connecting";
+  serviceStatus?: "connected" | "disconnected" | "connecting";
   onSettingsClick?: () => void;
   isLoading?: boolean;
   error?: Error | null;
+  isWhatsAppNotLinked?: boolean;
 }
 
 export function AppSidebar({
   customers = [],
   selectedCustomerId,
   onSelectCustomer,
-  connectionStatus = "disconnected",
+  serverStatus = "disconnected",
+  serviceStatus = "disconnected",
   onSettingsClick,
   isLoading = false,
   error = null,
+  isWhatsAppNotLinked = false,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -55,7 +59,7 @@ export function AppSidebar({
             <span className="text-xs text-muted-foreground">Intelligent Unification</span>
           </div>
         </div>
-        <ConnectionStatus status={connectionStatus} className="mt-2" />
+        <ConnectionStatus serverStatus={serverStatus} serviceStatus={serviceStatus} className="mt-2" />
       </SidebarHeader>
 
       <SidebarContent>
@@ -91,6 +95,12 @@ export function AppSidebar({
                       </div>
                     ))}
                   </div>
+                ) : isWhatsAppNotLinked ? (
+                  <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
+                    <Smartphone className="h-8 w-8 text-amber-500" />
+                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">WhatsApp Not Linked</p>
+                    <p className="text-xs text-muted-foreground">Connect your WhatsApp to see chats</p>
+                  </div>
                 ) : error ? (
                   <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
                     <AlertCircle className="h-8 w-8 text-destructive" />
@@ -124,7 +134,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="p-2 space-y-2">
-        <SyncButton disabled={connectionStatus !== "connected"} />
+        <SyncButton disabled={serviceStatus !== "connected"} />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

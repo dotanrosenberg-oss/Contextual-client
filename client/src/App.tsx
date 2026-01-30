@@ -37,18 +37,26 @@ function ChatView() {
   
   const sendMessageMutation = useSendMessage();
 
-  const isServerConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
+  const isServiceConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
+  const isServerReachable = !serverStatusError && serverStatus !== undefined;
 
-  const getConnectionStatus = useCallback((): "connected" | "disconnected" | "connecting" => {
+  const getServerStatus = useCallback((): "connected" | "disconnected" | "connecting" => {
     if (!settings?.configured) return "disconnected";
     if (serverStatusLoading) return "connecting";
-    if (isServerConnected) return "connected";
+    if (isServerReachable) return "connected";
     return "disconnected";
-  }, [settings, isServerConnected, serverStatusLoading]);
+  }, [settings, isServerReachable, serverStatusLoading]);
+
+  const getServiceStatus = useCallback((): "connected" | "disconnected" | "connecting" => {
+    if (!settings?.configured) return "disconnected";
+    if (serverStatusLoading) return "connecting";
+    if (isServiceConnected) return "connected";
+    return "disconnected";
+  }, [settings, isServiceConnected, serverStatusLoading]);
 
   const { status: wsStatus } = useWebSocket({
     apiKey: settings?.configured ? settings.apiKey || null : null,
-    onMessage: useCallback((msg) => {
+    onMessage: useCallback((msg: { type: string; data?: unknown }) => {
       console.log("WebSocket message received:", msg.type);
     }, []),
   });
@@ -68,7 +76,7 @@ function ChatView() {
   }
 
   const isServerUnreachable = settings?.configured && !serverStatusLoading && serverStatusError;
-  const isWhatsAppNotLinked = settings?.configured && !serverStatusLoading && !serverStatusError && serverStatus && !isServerConnected;
+  const isWhatsAppNotLinked = settings?.configured && !serverStatusLoading && !serverStatusError && serverStatus && !isServiceConnected;
 
   const handleSendMessage = async (message: string) => {
     if (!selectedCustomerId) return;
@@ -80,7 +88,8 @@ function ChatView() {
     }
   };
 
-  const connectionStatus = getConnectionStatus();
+  const serverConnectionStatus = getServerStatus();
+  const serviceConnectionStatus = getServiceStatus();
 
   return (
     <>
@@ -88,10 +97,12 @@ function ChatView() {
         customers={customers}
         selectedCustomerId={selectedCustomerId}
         onSelectCustomer={setSelectedCustomerId}
-        connectionStatus={connectionStatus}
+        serverStatus={serverConnectionStatus}
+        serviceStatus={serviceConnectionStatus}
         onSettingsClick={() => setSettingsOpen(true)}
         isLoading={customersLoading}
-        error={customersError as Error | null}
+        error={isWhatsAppNotLinked ? null : customersError as Error | null}
+        isWhatsAppNotLinked={isWhatsAppNotLinked}
       />
       
       <main className="flex flex-1 overflow-hidden">
@@ -105,7 +116,7 @@ function ChatView() {
                   <div>
                     <h2 className="font-medium text-sm">{selectedCustomer.name}</h2>
                     <p className="text-xs text-muted-foreground">
-                      {connectionStatus === "connected" ? "Online" : "Offline"}
+                      {serviceConnectionStatus === "connected" ? "Online" : "Offline"}
                     </p>
                   </div>
                 </>
