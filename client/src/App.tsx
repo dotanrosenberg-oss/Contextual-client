@@ -19,6 +19,7 @@ import { ContactAvatar } from "./components/ContactAvatar";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ServiceUnavailableState } from "./components/ServiceUnavailableState";
+import { WhatsAppNotLinkedState } from "./components/WhatsAppNotLinkedState";
 import { MessageSquare, AlertCircle, Settings } from "lucide-react";
 import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings } from "./lib/api";
 import { useWebSocket } from "./hooks/useWebSocket";
@@ -31,17 +32,19 @@ function ChatView() {
 
   const { data: customers = [], isLoading: customersLoading, error: customersError } = useCustomers();
   const { data: messages = [], isLoading: messagesLoading, error: messagesError } = useMessages(selectedCustomerId);
-  const { data: serverStatus, isLoading: serverStatusLoading, refetch: refetchStatus } = useServerStatus();
+  const { data: serverStatus, isLoading: serverStatusLoading, error: serverStatusError, refetch: refetchStatus } = useServerStatus();
   const { data: settings, isLoading: settingsLoading } = useSettings();
   
   const sendMessageMutation = useSendMessage();
 
+  const isServerConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
+
   const getConnectionStatus = useCallback((): "connected" | "disconnected" | "connecting" => {
     if (!settings?.configured) return "disconnected";
     if (serverStatusLoading) return "connecting";
-    if (serverStatus?.connected) return "connected";
+    if (isServerConnected) return "connected";
     return "disconnected";
-  }, [settings, serverStatus, serverStatusLoading]);
+  }, [settings, isServerConnected, serverStatusLoading]);
 
   const { status: wsStatus } = useWebSocket({
     apiKey: settings?.configured ? settings.apiKey || null : null,
@@ -64,7 +67,8 @@ function ChatView() {
     return <WelcomeScreen />;
   }
 
-  const isServiceUnavailable = settings?.configured && !serverStatusLoading && serverStatus && !serverStatus.connected;
+  const isServerUnreachable = settings?.configured && !serverStatusLoading && serverStatusError;
+  const isWhatsAppNotLinked = settings?.configured && !serverStatusLoading && !serverStatusError && serverStatus && !isServerConnected;
 
   const handleSendMessage = async (message: string) => {
     if (!selectedCustomerId) return;
@@ -123,9 +127,16 @@ function ChatView() {
           </header>
           
           <div className="flex-1 overflow-hidden">
-            {isServiceUnavailable ? (
+            {isServerUnreachable ? (
               <ServiceUnavailableState
-                message={serverStatus?.status || "Unable to connect to the WhatsApp server"}
+                message={(serverStatusError as Error)?.message || "Unable to reach the WhatsApp server. Please check your server URL and API key."}
+                onRetry={() => refetchStatus()}
+                onSettings={() => setSettingsOpen(true)}
+                isRetrying={serverStatusLoading}
+              />
+            ) : isWhatsAppNotLinked ? (
+              <WhatsAppNotLinkedState
+                message={serverStatus?.message || serverStatus?.status || "The WhatsApp server is not connected to WhatsApp"}
                 onRetry={() => refetchStatus()}
                 onSettings={() => setSettingsOpen(true)}
                 isRetrying={serverStatusLoading}

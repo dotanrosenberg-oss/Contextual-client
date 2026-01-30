@@ -12,8 +12,10 @@ import {
 } from "./messageCache";
 
 interface ServerStatus {
-  status: string;
-  connected: boolean;
+  status?: string;
+  message?: string;
+  connected?: boolean;
+  ready?: boolean;
   qrCode?: string;
   phoneNumber?: string;
 }

@@ -10,7 +10,7 @@ interface ServiceUnavailableStateProps {
 }
 
 export function ServiceUnavailableState({
-  message = "Unable to connect to the WhatsApp server",
+  message = "Unable to reach the WhatsApp server. Please check your server URL and API key.",
   onRetry,
   onSettings,
   isRetrying = false,
@@ -24,7 +24,7 @@ export function ServiceUnavailableState({
               <ServerOff className="h-8 w-8 text-destructive" />
             </div>
           </div>
-          <CardTitle>Service Unavailable</CardTitle>
+          <CardTitle>Connection Failed</CardTitle>
           <CardDescription className="text-base">{message}</CardDescription>
         </CardHeader>
 
