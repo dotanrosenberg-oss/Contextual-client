@@ -101,6 +101,9 @@ All components use Shadcn UI primitives with consistent styling:
 - Real-time WebSocket updates
 - Settings management and onboarding flow
 - Rebranded from "Contextful" to "Contextify" with new logo and color scheme
+- Added client-side message caching with IndexedDB for persistent state
+- Incremental message sync - only fetches new messages since last timestamp
+- WebSocket handler caches incoming messages in real-time
 
 ## User Preferences
 - Professional, clean interface

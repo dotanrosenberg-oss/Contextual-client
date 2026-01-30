@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { cacheMessage, cacheMessages, updateCachedCustomer, updateSyncMeta } from "@/lib/messageCache";
+import type { Message, Customer } from "@shared/schema";
 
 export interface WebSocketMessage {
   type: string;
@@ -42,18 +44,81 @@ export function useWebSocket({ apiKey, onMessage }: UseWebSocketOptions) {
         setStatus("connected");
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           
           if (message.type === "new_message" || message.type === "message_update") {
+            const msgData = message.data as { message?: Message; customerId?: string };
+            
+            if (msgData?.message) {
+              await cacheMessage(msgData.message);
+              
+              const customerId = msgData.customerId || msgData.message.customerId;
+              if (customerId) {
+                const msgTimestamp = new Date(msgData.message.timestamp).getTime();
+                await updateSyncMeta({
+                  key: `messages-${customerId}`,
+                  lastSyncTimestamp: msgTimestamp,
+                }).catch(() => {});
+              }
+              if (customerId) {
+                queryClient.setQueryData<Message[]>(
+                  ["/api/wa/customers", customerId, "messages"],
+                  (old) => {
+                    if (!old) return [msgData.message!];
+                    const exists = old.some((m) => m.id === msgData.message!.id);
+                    if (exists) {
+                      return old.map((m) => 
+                        m.id === msgData.message!.id ? msgData.message! : m
+                      );
+                    }
+                    const updated = [...old, msgData.message!];
+                    updated.sort((a, b) => 
+                      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                    );
+                    return updated;
+                  }
+                );
+              }
+            }
+            
             queryClient.invalidateQueries({
               queryKey: ["/api/wa/customers"],
             });
-            const msgData = message.data as { customerId?: string };
-            if (msgData?.customerId) {
+          }
+          
+          if (message.type === "messages_batch") {
+            const batchData = message.data as { messages?: Message[]; customerId?: string };
+            if (batchData?.messages && batchData.messages.length > 0) {
+              await cacheMessages(batchData.messages);
+              
+              if (batchData.customerId) {
+                const latestMsg = batchData.messages.reduce((latest, msg) => {
+                  const msgTime = new Date(msg.timestamp).getTime();
+                  return msgTime > latest ? msgTime : latest;
+                }, 0);
+                
+                if (latestMsg > 0) {
+                  await updateSyncMeta({
+                    key: `messages-${batchData.customerId}`,
+                    lastSyncTimestamp: latestMsg,
+                  }).catch(() => {});
+                }
+                
+                queryClient.invalidateQueries({
+                  queryKey: ["/api/wa/customers", batchData.customerId, "messages"],
+                });
+              }
+            }
+          }
+          
+          if (message.type === "customer_update") {
+            const custData = message.data as { customer?: Customer };
+            if (custData?.customer) {
+              await updateCachedCustomer(custData.customer);
               queryClient.invalidateQueries({
-                queryKey: ["/api/wa/customers", msgData.customerId, "messages"],
+                queryKey: ["/api/wa/customers"],
               });
             }
           }

@@ -25,6 +25,7 @@ const checkNumberSchema = z.object({
 });
 
 const limitQuerySchema = z.coerce.number().int().min(1).max(500).default(100);
+const sinceQuerySchema = z.coerce.number().int().min(0).optional();
 
 async function getWaSettings() {
   const settings = await storage.getSettings();
@@ -276,7 +277,15 @@ export async function registerRoutes(
     const { id } = req.params;
     const limitResult = limitQuerySchema.safeParse(req.query.limit);
     const limit = limitResult.success ? limitResult.data : 100;
-    const { status, data } = await makeWaRequest("GET", `/api/customers/${encodeURIComponent(id)}/messages?limit=${limit}`);
+    const sinceResult = sinceQuerySchema.safeParse(req.query.since);
+    const since = sinceResult.success ? sinceResult.data : undefined;
+    
+    let path = `/api/customers/${encodeURIComponent(id)}/messages?limit=${limit}`;
+    if (since !== undefined) {
+      path += `&since=${since}`;
+    }
+    
+    const { status, data } = await makeWaRequest("GET", path);
     res.status(status).json(data);
   });
 

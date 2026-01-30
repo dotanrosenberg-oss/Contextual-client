@@ -1,6 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { apiRequest, queryClient } from "./queryClient";
 import type { Customer, Message, ContactInsight } from "@shared/schema";
+import {
+  getCachedMessages,
+  cacheMessages,
+  getCachedCustomers,
+  cacheCustomers,
+  getSyncMeta,
+  updateSyncMeta,
+} from "./messageCache";
 
 interface ServerStatus {
   status: string;
@@ -22,27 +31,125 @@ interface SendMessageResponse {
 }
 
 export function useCustomers() {
-  return useQuery<Customer[]>({
+  const query = useQuery<Customer[]>({
     queryKey: ["/api/wa/customers"],
+    staleTime: 30000,
   });
+
+  useEffect(() => {
+    if (query.data && query.data.length > 0) {
+      cacheCustomers(query.data);
+    }
+  }, [query.data]);
+
+  const isLoading = query.isLoading;
+  const data = query.data;
+
+  useEffect(() => {
+    if (isLoading && (!data || data.length === 0)) {
+      getCachedCustomers().then((cached) => {
+        if (cached.length > 0) {
+          queryClient.setQueryData(["/api/wa/customers"], cached);
+        }
+      });
+    }
+  }, [isLoading, data]);
+
+  return query;
 }
 
 export function useMessages(customerId: string | null) {
-  return useQuery<Message[]>({
+  const query = useQuery<Message[]>({
     queryKey: ["/api/wa/customers", customerId, "messages"],
     enabled: !!customerId,
+    staleTime: 60000,
     queryFn: async () => {
       if (!customerId) return [];
-      const res = await fetch(`/api/wa/customers/${encodeURIComponent(customerId)}/messages`, {
-        credentials: "include",
-      });
+
+      const syncKey = `messages-${customerId}`;
+      let cachedMessages: Message[] = [];
+      let syncMeta = null;
+      let cacheReadFailed = false;
+      
+      try {
+        syncMeta = await getSyncMeta(syncKey);
+      } catch (e) {
+        console.warn("Sync meta read failed:", e);
+      }
+      
+      try {
+        cachedMessages = await getCachedMessages(customerId);
+      } catch (e) {
+        console.warn("Cache read failed:", e);
+        cacheReadFailed = true;
+      }
+
+      const lastSyncTimestamp = syncMeta?.lastSyncTimestamp || null;
+      
+      let url = `/api/wa/customers/${encodeURIComponent(customerId)}/messages`;
+      if (lastSyncTimestamp) {
+        url += `?since=${lastSyncTimestamp}`;
+      }
+
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
+        if (cachedMessages.length > 0) {
+          return cachedMessages;
+        }
         const text = await res.text();
         throw new Error(`${res.status}: ${text || res.statusText}`);
       }
-      return res.json();
+
+      const serverMessages: Message[] = await res.json();
+      
+      const existingIds = new Set(cachedMessages.map((m) => m.id));
+      const uniqueNewMessages = serverMessages.filter((m) => !existingIds.has(m.id));
+      
+      const allMessages = cacheReadFailed 
+        ? serverMessages 
+        : [...cachedMessages, ...uniqueNewMessages];
+      allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
+      try {
+        if (uniqueNewMessages.length > 0) {
+          await cacheMessages(uniqueNewMessages);
+        } else if (cacheReadFailed && serverMessages.length > 0) {
+          await cacheMessages(serverMessages);
+        }
+        
+        const latestTimestamp = allMessages.length > 0
+          ? new Date(allMessages[allMessages.length - 1].timestamp).getTime()
+          : Date.now();
+        
+        await updateSyncMeta({
+          key: syncKey,
+          lastSyncTimestamp: latestTimestamp,
+        });
+      } catch (e) {
+        console.warn("Cache write failed:", e);
+      }
+
+      return allMessages;
     },
   });
+
+  const msgIsLoading = query.isLoading;
+  const msgData = query.data;
+
+  useEffect(() => {
+    if (customerId && msgIsLoading && (!msgData || msgData.length === 0)) {
+      getCachedMessages(customerId).then((cached) => {
+        if (cached.length > 0) {
+          queryClient.setQueryData(
+            ["/api/wa/customers", customerId, "messages"],
+            cached
+          );
+        }
+      }).catch(() => {});
+    }
+  }, [customerId, msgIsLoading, msgData]);
+
+  return query;
 }
 
 interface SendMessageVariables {
@@ -63,10 +170,31 @@ export function useSendMessage() {
       );
       return res.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/wa/customers", variables.customerId, "messages"],
-      });
+    onSuccess: async (response, variables) => {
+      if (response.message) {
+        await cacheMessages([response.message]);
+        
+        const msgTimestamp = new Date(response.message.timestamp).getTime();
+        await updateSyncMeta({
+          key: `messages-${variables.customerId}`,
+          lastSyncTimestamp: msgTimestamp,
+        }).catch(() => {});
+        
+        queryClient.setQueryData<Message[]>(
+          ["/api/wa/customers", variables.customerId, "messages"],
+          (old) => {
+            if (!old) return [response.message!];
+            const exists = old.some((m) => m.id === response.message!.id);
+            if (exists) return old;
+            const updated = [...old, response.message!];
+            updated.sort((a, b) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+            return updated;
+          }
+        );
+      }
+      
       queryClient.invalidateQueries({
         queryKey: ["/api/wa/customers"],
       });
