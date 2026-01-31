@@ -457,5 +457,61 @@ Respond in JSON format with the following structure:
     }
   });
 
+  // Failed participants routes
+  app.get("/api/customers/:customerId/failed-participants", async (req: Request, res: Response) => {
+    try {
+      const { customerId } = req.params;
+      const failedParticipants = await storage.getFailedParticipants(customerId);
+      res.json({ failedParticipants });
+    } catch (error) {
+      console.error("Failed to get failed participants:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve failed participants" });
+    }
+  });
+
+  const saveFailedParticipantsSchema = z.object({
+    customerId: z.string(),
+    participants: z.array(z.object({
+      phoneNumber: z.string(),
+      reason: z.string(),
+    })),
+  });
+
+  app.post("/api/customers/failed-participants", async (req: Request, res: Response) => {
+    try {
+      const parsed = saveFailedParticipantsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.message });
+      }
+
+      const { customerId, participants } = parsed.data;
+      const toSave = participants.map(p => ({
+        customerId,
+        phoneNumber: p.phoneNumber,
+        reason: p.reason,
+      }));
+
+      const saved = await storage.saveFailedParticipants(toSave);
+      res.json({ success: true, failedParticipants: saved });
+    } catch (error) {
+      console.error("Failed to save failed participants:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to save failed participants" });
+    }
+  });
+
+  app.delete("/api/customers/failed-participants/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "INVALID_ID", message: "Invalid participant ID" });
+      }
+      await storage.deleteFailedParticipant(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete failed participant:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to delete failed participant" });
+    }
+  });
+
   return httpServer;
 }
