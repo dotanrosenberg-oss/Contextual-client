@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiRequest, queryClient } from "./queryClient";
-import type { Customer, Message, ContactInsight, Participant } from "@shared/schema";
+import type { Customer, Message, ContactInsight, Participant, FailedParticipant } from "@shared/schema";
 import {
   getCachedMessages,
   cacheMessages,
@@ -439,6 +439,52 @@ export function useImportHistory() {
           }
         );
       }
+    },
+  });
+}
+
+interface FailedParticipantsResponse {
+  failedParticipants: FailedParticipant[];
+}
+
+export function useFailedParticipants(customerId: string | null) {
+  return useQuery<FailedParticipantsResponse, Error, FailedParticipant[]>({
+    queryKey: [`/api/customers/${customerId}/failed-participants`],
+    enabled: !!customerId,
+    staleTime: 60000,
+    select: (data) => data.failedParticipants || [],
+  });
+}
+
+interface SaveFailedParticipantsPayload {
+  customerId: string;
+  participants: { phoneNumber: string; reason: string }[];
+}
+
+export function useSaveFailedParticipants() {
+  const qc = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (payload: SaveFailedParticipantsPayload) => {
+      const res = await apiRequest("POST", "/api/customers/failed-participants", payload);
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: [`/api/customers/${variables.customerId}/failed-participants`] });
+    },
+  });
+}
+
+export function useDeleteFailedParticipant() {
+  const qc = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, customerId }: { id: number; customerId: string }) => {
+      const res = await apiRequest("DELETE", `/api/customers/failed-participants/${id}`);
+      return { ...await res.json(), customerId };
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: [`/api/customers/${data.customerId}/failed-participants`] });
     },
   });
 }

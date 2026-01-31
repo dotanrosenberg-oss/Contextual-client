@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useGroupParticipants } from "@/lib/api";
+import { useGroupParticipants, useFailedParticipants, useDeleteFailedParticipant } from "@/lib/api";
 import { ContactAvatar } from "./ContactAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, RefreshCw, Search, Phone, Users } from "lucide-react";
-import type { Participant } from "@shared/schema";
+import { AlertCircle, RefreshCw, Search, Phone, Users, X } from "lucide-react";
+import type { Participant, FailedParticipant } from "@shared/schema";
 
 interface ParticipantListProps {
   groupId: string;
@@ -59,6 +59,44 @@ function ParticipantItem({ participant }: { participant: Participant }) {
   );
 }
 
+interface FailedParticipantItemProps {
+  failed: FailedParticipant;
+  onRemove: (id: number) => void;
+  isRemoving: boolean;
+}
+
+function FailedParticipantItem({ failed, onRemove, isRemoving }: FailedParticipantItemProps) {
+  return (
+    <div
+      className="flex items-center gap-3 p-3 rounded-md opacity-60"
+      data-testid={`failed-participant-item-${failed.id}`}
+    >
+      <ContactAvatar
+        name={failed.phoneNumber}
+        size="md"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium truncate line-through">{formatPhoneNumber(failed.phoneNumber)}</span>
+          <Badge variant="outline" className="text-xs text-destructive border-destructive">Failed</Badge>
+        </div>
+        <div className="text-xs text-destructive mt-0.5">
+          {failed.reason}
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onRemove(failed.id)}
+        disabled={isRemoving}
+        data-testid={`button-remove-failed-${failed.id}`}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-2 p-2">
@@ -78,6 +116,12 @@ function LoadingSkeleton() {
 export function ParticipantList({ groupId, includePhotos = false }: ParticipantListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const { data: participants = [], isLoading, error, refetch, isRefetching } = useGroupParticipants(groupId, includePhotos);
+  const { data: failedParticipants = [] } = useFailedParticipants(groupId);
+  const deleteFailedParticipantMutation = useDeleteFailedParticipant();
+
+  const handleRemoveFailedParticipant = (id: number) => {
+    deleteFailedParticipantMutation.mutate({ id, customerId: groupId });
+  };
 
   const filteredParticipants = participants.filter((p) => {
     const searchLower = searchQuery.toLowerCase();
@@ -180,15 +224,36 @@ export function ParticipantList({ groupId, includePhotos = false }: ParticipantL
       
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {sortedParticipants.length === 0 ? (
+          {sortedParticipants.length === 0 && failedParticipants.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <Search className="h-8 w-8 mb-2" />
               <p className="text-sm">No participants match "{searchQuery}"</p>
             </div>
           ) : (
-            sortedParticipants.map((participant) => (
-              <ParticipantItem key={participant.id} participant={participant} />
-            ))
+            <>
+              {sortedParticipants.map((participant) => (
+                <ParticipantItem key={participant.id} participant={participant} />
+              ))}
+              
+              {failedParticipants.length > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-2 px-3 pb-2">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span className="text-sm font-medium text-destructive">
+                      Failed to add ({failedParticipants.length})
+                    </span>
+                  </div>
+                  {failedParticipants.map((failed) => (
+                    <FailedParticipantItem
+                      key={failed.id}
+                      failed={failed}
+                      onRemove={handleRemoveFailedParticipant}
+                      isRemoving={deleteFailedParticipantMutation.isPending}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </ScrollArea>

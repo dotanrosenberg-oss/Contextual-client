@@ -22,7 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useCreateGroup } from "@/lib/api";
+import { useCreateGroup, useSaveFailedParticipants } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const createGroupFormSchema = z.object({
@@ -52,6 +52,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
   const { toast } = useToast();
   
   const createGroupMutation = useCreateGroup();
+  const saveFailedParticipantsMutation = useSaveFailedParticipants();
   
   const form = useForm<CreateGroupFormValues>({
     resolver: zodResolver(createGroupFormSchema),
@@ -160,6 +161,17 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         // Remove successful participants from the list
         const failedNumberSet = new Set(failedNumbers.map(f => f.number));
         setParticipants(prev => prev.filter(p => failedNumberSet.has(p)));
+        
+        // Save failed participants to database for display in participant list
+        if (result.groupId) {
+          saveFailedParticipantsMutation.mutate({
+            customerId: result.groupId,
+            participants: failedNumbers.map(f => ({
+              phoneNumber: f.number,
+              reason: f.reason || "unknown reason",
+            })),
+          });
+        }
         
         toast({
           title: "Group created",
