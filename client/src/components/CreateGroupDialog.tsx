@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, X, Upload, Users, Loader2, AlertCircle, Pencil, MessageSquare, UserPlus, Link2, ShieldCheck } from "lucide-react";
+import { Plus, X, Upload, Users, Loader2, AlertCircle, Pencil, MessageSquare, UserPlus, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +48,6 @@ interface GroupSettings {
   membersCanEditGroupSettings: boolean;
   membersCanSendMessages: boolean;
   membersCanAddOthers: boolean;
-  membersCanInviteViaLink: boolean;
   adminsApproveNewMembers: boolean;
 }
 
@@ -56,7 +55,6 @@ const defaultGroupSettings: GroupSettings = {
   membersCanEditGroupSettings: true,
   membersCanSendMessages: true,
   membersCanAddOthers: true,
-  membersCanInviteViaLink: false,
   adminsApproveNewMembers: false,
 };
 
@@ -485,22 +483,6 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
                       onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, membersCanAddOthers: checked === true }))}
                       className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                       data-testid="checkbox-add-members"
-                    />
-                  </label>
-
-                  <label 
-                    className="flex items-start gap-3 cursor-pointer"
-                    data-testid="setting-invite-link"
-                  >
-                    <Link2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">Invite via link or QR code</div>
-                    </div>
-                    <Checkbox 
-                      checked={groupSettings.membersCanInviteViaLink}
-                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, membersCanInviteViaLink: checked === true }))}
-                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                      data-testid="checkbox-invite-link"
                     />
                   </label>
 
