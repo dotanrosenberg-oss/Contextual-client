@@ -144,10 +144,10 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
       const failedNumbers = result.results?.failed || [];
       
       if (failedNumbers.length > 0) {
-        const failedList = failedNumbers.map(f => f.number).join(", ");
+        const failedList = failedNumbers.map(f => `${f.number} (${f.reason || "unknown reason"})`).join("; ");
         toast({
           title: "Group created with some issues",
-          description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}. Could not add: ${failedList}`,
+          description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}. Failed: ${failedList}`,
           variant: "destructive",
         });
       } else {
