@@ -2,10 +2,11 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, X, Upload, Users, Loader2, AlertCircle } from "lucide-react";
+import { Plus, X, Upload, Users, Loader2, AlertCircle, Pencil, MessageSquare, UserPlus, Link2, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -22,6 +23,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateGroup, useSaveFailedParticipants } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -40,6 +44,22 @@ interface FailedParticipant {
   reason: string;
 }
 
+interface GroupSettings {
+  membersCanEditGroupSettings: boolean;
+  membersCanSendMessages: boolean;
+  membersCanAddOthers: boolean;
+  membersCanInviteViaLink: boolean;
+  adminsApproveNewMembers: boolean;
+}
+
+const defaultGroupSettings: GroupSettings = {
+  membersCanEditGroupSettings: true,
+  membersCanSendMessages: true,
+  membersCanAddOthers: true,
+  membersCanInviteViaLink: false,
+  adminsApproveNewMembers: false,
+};
+
 export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) {
   const [open, setOpen] = useState(false);
   const [participants, setParticipants] = useState<string[]>([]);
@@ -48,6 +68,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [createdGroupName, setCreatedGroupName] = useState<string | null>(null);
+  const [groupSettings, setGroupSettings] = useState<GroupSettings>(defaultGroupSettings);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -202,6 +223,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         setCreatedGroupName(null);
         setImagePreview(null);
         setImageBase64(null);
+        setGroupSettings(defaultGroupSettings);
       }
     } catch (error) {
       toast({
@@ -233,7 +255,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
           Create Group
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md" data-testid="dialog-create-group">
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col" data-testid="dialog-create-group">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {createdGroupName ? (
@@ -248,10 +270,16 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
               </>
             )}
           </DialogTitle>
+          <DialogDescription>
+            {createdGroupName 
+              ? "Review the failed participants below."
+              : "Set up your group with members and configure permissions."}
+          </DialogDescription>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <ScrollArea className="flex-1 overflow-y-auto pr-2">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {createdGroupName && (
               <p className="text-sm text-muted-foreground">
                 Group "{createdGroupName}" was created. The following numbers couldn't be added:
@@ -402,6 +430,112 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
               )}
             </div>
 
+            {!createdGroupName && (
+              <>
+                <Separator />
+                
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-muted-foreground">Members can</div>
+                  
+                  <label 
+                    className="flex items-start gap-3 cursor-pointer"
+                    data-testid="setting-edit-group"
+                  >
+                    <Pencil className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Edit group settings</div>
+                      <div className="text-xs text-muted-foreground">
+                        This includes the group name, icon, description, disappearing message timer, advanced chat privacy, and the ability to pin
+                      </div>
+                    </div>
+                    <Checkbox 
+                      checked={groupSettings.membersCanEditGroupSettings}
+                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, membersCanEditGroupSettings: checked === true }))}
+                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                      data-testid="checkbox-edit-group"
+                    />
+                  </label>
+
+                  <label 
+                    className="flex items-start gap-3 cursor-pointer"
+                    data-testid="setting-send-messages"
+                  >
+                    <MessageSquare className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Send new messages</div>
+                    </div>
+                    <Checkbox 
+                      checked={groupSettings.membersCanSendMessages}
+                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, membersCanSendMessages: checked === true }))}
+                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                      data-testid="checkbox-send-messages"
+                    />
+                  </label>
+
+                  <label 
+                    className="flex items-start gap-3 cursor-pointer"
+                    data-testid="setting-add-members"
+                  >
+                    <UserPlus className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Add other members</div>
+                    </div>
+                    <Checkbox 
+                      checked={groupSettings.membersCanAddOthers}
+                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, membersCanAddOthers: checked === true }))}
+                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                      data-testid="checkbox-add-members"
+                    />
+                  </label>
+
+                  <label 
+                    className="flex items-start gap-3 cursor-pointer"
+                    data-testid="setting-invite-link"
+                  >
+                    <Link2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Invite via link or QR code</div>
+                    </div>
+                    <Checkbox 
+                      checked={groupSettings.membersCanInviteViaLink}
+                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, membersCanInviteViaLink: checked === true }))}
+                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                      data-testid="checkbox-invite-link"
+                    />
+                  </label>
+
+                  <p className="text-xs text-muted-foreground">
+                    Turning off these settings means that only group admins can perform this action.
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-muted-foreground">Admins can</div>
+                  
+                  <label 
+                    className="flex items-start gap-3 cursor-pointer"
+                    data-testid="setting-approve-members"
+                  >
+                    <ShieldCheck className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Approve new members</div>
+                      <div className="text-xs text-muted-foreground">
+                        When turned on, admins must approve anyone who wants to join this group.
+                      </div>
+                    </div>
+                    <Checkbox 
+                      checked={groupSettings.adminsApproveNewMembers}
+                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, adminsApproveNewMembers: checked === true }))}
+                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                      data-testid="checkbox-approve-members"
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               {createdGroupName ? (
                 <Button
@@ -414,6 +548,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
                     setCreatedGroupName(null);
                     setImagePreview(null);
                     setImageBase64(null);
+                    setGroupSettings(defaultGroupSettings);
                   }}
                   data-testid="button-done-create-group"
                 >
@@ -446,8 +581,9 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
                 </>
               )}
             </div>
-          </form>
-        </Form>
+            </form>
+          </Form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
