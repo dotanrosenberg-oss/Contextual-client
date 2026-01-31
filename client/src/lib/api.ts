@@ -337,13 +337,54 @@ interface CreateGroupResponse {
   customer?: Customer;
 }
 
+interface CreateGroupErrorResponse {
+  success: false;
+  error: string;
+  message?: string;
+  results?: {
+    added: { number: string; whatsappId: string }[];
+    failed: { number: string; reason: string }[];
+  };
+}
+
+function parseCreateGroupError(data: CreateGroupErrorResponse): string {
+  if (data.error === "ALL_PARTICIPANTS_FAILED") {
+    const failedNumbers = data.results?.failed || [];
+    if (failedNumbers.length === 1) {
+      return `The phone number ${failedNumbers[0].number} is not registered on WhatsApp or doesn't allow group invites.`;
+    }
+    if (failedNumbers.length > 0) {
+      return `None of the phone numbers could be added. They may not be registered on WhatsApp or don't allow group invites.`;
+    }
+    return "No participants could be added to the group. Please verify the phone numbers are registered on WhatsApp.";
+  }
+  
+  if (data.message) {
+    return data.message;
+  }
+  
+  return "Failed to create group. Please try again.";
+}
+
 export function useCreateGroup() {
   const qc = useQueryClient();
   
   return useMutation<CreateGroupResponse, Error, CreateGroupPayload>({
     mutationFn: async (payload) => {
-      const res = await apiRequest("POST", "/api/wa/groups/create", payload);
-      return res.json();
+      const res = await fetch("/api/wa/groups/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok || data.success === false) {
+        throw new Error(parseCreateGroupError(data));
+      }
+      
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/wa/customers"] });
