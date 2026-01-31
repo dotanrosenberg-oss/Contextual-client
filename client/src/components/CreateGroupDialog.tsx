@@ -167,12 +167,21 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         const groupIdentifier = result.groupId || result.customer?.id;
         console.log("Group creation result:", result, "Using groupId:", groupIdentifier);
         if (groupIdentifier) {
-          saveFailedParticipantsMutation.mutate({
+          const payload = {
             customerId: groupIdentifier,
             participants: failedNumbers.map(f => ({
               phoneNumber: f.number,
               reason: f.reason || "unknown reason",
             })),
+          };
+          console.log("Saving failed participants with payload:", payload);
+          saveFailedParticipantsMutation.mutate(payload, {
+            onSuccess: (data) => {
+              console.log("Successfully saved failed participants:", data);
+            },
+            onError: (error) => {
+              console.error("Error saving failed participants:", error);
+            },
           });
         }
         

@@ -120,7 +120,7 @@ export type Participant = z.infer<typeof participantSchema>;
 
 export const failedParticipants = pgTable("failed_participants", {
   id: serial("id").primaryKey(),
-  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  customerId: varchar("customer_id").notNull(),
   phoneNumber: text("phone_number").notNull(),
   reason: text("reason").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
