@@ -109,6 +109,7 @@ All components use Shadcn UI primitives with consistent styling:
 - Import history button in chat header to fetch historical messages from WhatsApp
 - Show last message preview when message history is not yet available
 - Added group participants panel - click member count to view group members with admin badges and search
+- Added group creation dialog - create new groups with name, image, and phone numbers from the sidebar
 
 ## User Preferences
 - Professional, clean interface

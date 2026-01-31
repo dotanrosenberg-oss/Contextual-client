@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { CustomerListItem } from "./CustomerListItem";
 import { SyncButton } from "./SyncButton";
+import { CreateGroupDialog } from "./CreateGroupDialog";
 import type { Customer } from "@shared/schema";
 
 interface AppSidebarProps {
@@ -134,6 +135,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="p-2 space-y-2">
+        <CreateGroupDialog disabled={serviceStatus !== "connected"} />
         <SyncButton disabled={serviceStatus !== "connected"} />
         <SidebarMenu>
           <SidebarMenuItem>

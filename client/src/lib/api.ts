@@ -315,6 +315,42 @@ export function useGroupParticipants(groupId: string | null, includePhotos: bool
   });
 }
 
+interface CreateGroupPayload {
+  name: string;
+  participants: string[];
+  image?: string;
+}
+
+interface CreateGroupResponse {
+  success: boolean;
+  groupId: string;
+  groupName: string;
+  results: {
+    added: { number: string; whatsappId: string }[];
+    failed: { number: string; reason: string }[];
+  };
+  summary: {
+    totalRequested: number;
+    successfullyAdded: number;
+    failedToAdd: number;
+  };
+  customer?: Customer;
+}
+
+export function useCreateGroup() {
+  const qc = useQueryClient();
+  
+  return useMutation<CreateGroupResponse, Error, CreateGroupPayload>({
+    mutationFn: async (payload) => {
+      const res = await apiRequest("POST", "/api/wa/groups/create", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/wa/customers"] });
+    },
+  });
+}
+
 export function useImportHistory() {
   const qc = useQueryClient();
   
