@@ -57,14 +57,20 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
     const phone = phoneInput.trim();
     if (!phone) return;
     
-    const normalizedPhone = phone.replace(/[^\d+]/g, "");
+    let normalizedPhone = phone.replace(/[^\d+]/g, "");
+    
     if (normalizedPhone.length < 7) {
       toast({
         title: "Invalid phone number",
-        description: "Please enter a valid phone number",
+        description: "Please enter a valid phone number with country code",
         variant: "destructive",
       });
       return;
+    }
+    
+    // Add + prefix if missing (user entered digits only)
+    if (!normalizedPhone.startsWith("+")) {
+      normalizedPhone = "+" + normalizedPhone;
     }
     
     if (participants.includes(normalizedPhone)) {
