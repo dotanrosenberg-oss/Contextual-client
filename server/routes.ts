@@ -327,6 +327,15 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
+  app.get("/api/wa/customers/:id/participants", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const includePhotos = req.query.includePhotos === "true";
+    
+    const path = `/api/customers/${encodeURIComponent(id)}/participants?includePhotos=${includePhotos}`;
+    const { status, data } = await makeWaRequest("GET", path);
+    res.status(status).json(data);
+  });
+
   // AI Insights route
   const generateInsightsSchema = z.object({
     customerId: z.string(),
