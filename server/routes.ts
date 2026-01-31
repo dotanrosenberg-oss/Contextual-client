@@ -111,7 +111,6 @@ function setupWaWebSocket() {
       waWebSocket.on("message", (data) => {
         try {
           const message = JSON.parse(data.toString());
-          console.log("WA WebSocket message received:", message.type, message.data ? JSON.stringify(message.data).slice(0, 100) : "");
           broadcastToClients(message);
         } catch (e) {
           console.error("Failed to parse WA WebSocket message:", e);

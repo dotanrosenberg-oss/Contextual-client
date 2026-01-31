@@ -48,19 +48,15 @@ export function useWebSocket({ apiKey, onMessage }: UseWebSocketOptions) {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           
-          if (message.type === "message" || message.type === "new_message" || message.type === "message_update") {
-            // Handle both formats:
-            // - WA server sends: { type: "message", data: { id, body, customerId, ... } }
-            // - Legacy format: { type: "new_message", data: { message: {...}, customerId } }
-            const msgData = message.data as (Message & { message?: Message; customerId?: string });
-            const actualMessage: Message | undefined = msgData?.message || (msgData?.id ? msgData as Message : undefined);
+          if (message.type === "new_message" || message.type === "message_update") {
+            const msgData = message.data as { message?: Message; customerId?: string };
             
-            if (actualMessage) {
-              await cacheMessage(actualMessage);
+            if (msgData?.message) {
+              await cacheMessage(msgData.message);
               
-              const customerId = msgData.customerId || actualMessage.customerId;
+              const customerId = msgData.customerId || msgData.message.customerId;
               if (customerId) {
-                const msgTimestamp = new Date(actualMessage.timestamp).getTime();
+                const msgTimestamp = new Date(msgData.message.timestamp).getTime();
                 await updateSyncMeta({
                   key: `messages-${customerId}`,
                   lastSyncTimestamp: msgTimestamp,
@@ -70,14 +66,14 @@ export function useWebSocket({ apiKey, onMessage }: UseWebSocketOptions) {
                 queryClient.setQueryData<Message[]>(
                   ["/api/wa/customers", customerId, "messages"],
                   (old) => {
-                    if (!old) return [actualMessage];
-                    const exists = old.some((m) => m.id === actualMessage.id);
+                    if (!old) return [msgData.message!];
+                    const exists = old.some((m) => m.id === msgData.message!.id);
                     if (exists) {
                       return old.map((m) => 
-                        m.id === actualMessage.id ? actualMessage : m
+                        m.id === msgData.message!.id ? msgData.message! : m
                       );
                     }
-                    const updated = [...old, actualMessage];
+                    const updated = [...old, msgData.message!];
                     updated.sort((a, b) => 
                       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
                     );
