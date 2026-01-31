@@ -63,7 +63,7 @@ function ChatView() {
   const { status: wsStatus } = useWebSocket({
     apiKey: settings?.configured ? settings.apiKey || null : null,
     onMessage: useCallback((msg: { type: string; data?: unknown }) => {
-      console.log("WebSocket message received:", msg.type);
+      console.log("WebSocket message received:", msg.type, JSON.stringify(msg.data));
     }, []),
   });
 
