@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, X, Upload, Users, Loader2 } from "lucide-react";
+import { Plus, X, Upload, Users, Loader2, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,12 +35,19 @@ interface CreateGroupDialogProps {
   disabled?: boolean;
 }
 
+interface FailedParticipant {
+  number: string;
+  reason: string;
+}
+
 export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) {
   const [open, setOpen] = useState(false);
   const [participants, setParticipants] = useState<string[]>([]);
+  const [failedParticipants, setFailedParticipants] = useState<FailedParticipant[]>([]);
   const [phoneInput, setPhoneInput] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [createdGroupName, setCreatedGroupName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -144,23 +151,34 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
       const failedNumbers = result.results?.failed || [];
       
       if (failedNumbers.length > 0) {
-        const failedList = failedNumbers.map(f => `${f.number} (${f.reason || "unknown reason"})`).join("; ");
+        // Keep dialog open to show failed participants
+        setCreatedGroupName(result.groupName);
+        setFailedParticipants(failedNumbers.map(f => ({
+          number: f.number,
+          reason: f.reason || "unknown reason"
+        })));
+        // Remove successful participants from the list
+        const failedNumberSet = new Set(failedNumbers.map(f => f.number));
+        setParticipants(prev => prev.filter(p => failedNumberSet.has(p)));
+        
         toast({
           title: "Group created",
-          description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}. Some numbers couldn't be added: ${failedList}`,
+          description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}. See failed numbers below.`,
         });
       } else {
         toast({
           title: "Group created",
           description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}`,
         });
+        
+        setOpen(false);
+        form.reset();
+        setParticipants([]);
+        setFailedParticipants([]);
+        setCreatedGroupName(null);
+        setImagePreview(null);
+        setImageBase64(null);
       }
-      
-      setOpen(false);
-      form.reset();
-      setParticipants([]);
-      setImagePreview(null);
-      setImageBase64(null);
     } catch (error) {
       toast({
         title: "Failed to create group",
@@ -194,13 +212,29 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
       <DialogContent className="sm:max-w-md" data-testid="dialog-create-group">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Create New Group
+            {createdGroupName ? (
+              <>
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Some members couldn't be added
+              </>
+            ) : (
+              <>
+                <Users className="h-5 w-5" />
+                Create New Group
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {createdGroupName && (
+              <p className="text-sm text-muted-foreground">
+                Group "{createdGroupName}" was created. The following numbers couldn't be added:
+              </p>
+            )}
+            
+            {!createdGroupName && (
             <div className="flex items-center gap-4">
               <div className="relative">
                 <Avatar className="h-16 w-16 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -251,80 +285,142 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
                 />
               </div>
             </div>
+            )}
 
             <div className="space-y-2">
-              <FormLabel>Participants</FormLabel>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter phone number..."
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  data-testid="input-phone-number"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  onClick={handleAddParticipant}
-                  data-testid="button-add-participant"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {participants.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {participants.map((phone) => (
-                    <Badge
-                      key={phone}
-                      variant="secondary"
-                      className="pr-1 flex items-center gap-1"
-                    >
-                      {phone}
-                      <button
-                        type="button"
-                        className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-foreground/10 transition-colors"
-                        onClick={() => handleRemoveParticipant(phone)}
-                        data-testid={`button-remove-participant-${phone}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
+              {!createdGroupName && <FormLabel>Participants</FormLabel>}
+              {!createdGroupName && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter phone number..."
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    data-testid="input-phone-number"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    onClick={handleAddParticipant}
+                    data-testid="button-add-participant"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
               )}
               
-              <p className="text-xs text-muted-foreground">
-                {participants.length === 0
-                  ? "Add phone numbers with country code (e.g., +1234567890)"
-                  : `${participants.length} participant${participants.length === 1 ? "" : "s"} added`}
-              </p>
+              {(participants.length > 0 || failedParticipants.length > 0) && (
+                <div className="flex flex-col gap-2 mt-2">
+                  {/* Regular participants */}
+                  {participants.filter(p => !failedParticipants.some(f => f.number === p)).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {participants
+                        .filter(p => !failedParticipants.some(f => f.number === p))
+                        .map((phone) => (
+                          <Badge
+                            key={phone}
+                            variant="secondary"
+                            className="pr-1 flex items-center gap-1"
+                          >
+                            {phone}
+                            <button
+                              type="button"
+                              className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-foreground/10 transition-colors"
+                              onClick={() => handleRemoveParticipant(phone)}
+                              data-testid={`button-remove-participant-${phone}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+                  
+                  {/* Failed participants with strikethrough */}
+                  {failedParticipants.length > 0 && (
+                    <div className="space-y-1">
+                      {failedParticipants.map((failed) => (
+                        <div key={failed.number} className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="pr-1 flex items-center gap-1 opacity-60"
+                            >
+                              <span className="line-through">{failed.number}</span>
+                              <button
+                                type="button"
+                                className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-foreground/10 transition-colors"
+                                onClick={() => {
+                                  setFailedParticipants(prev => prev.filter(f => f.number !== failed.number));
+                                  setParticipants(prev => prev.filter(p => p !== failed.number));
+                                }}
+                                data-testid={`button-remove-failed-${failed.number}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-destructive ml-1">{failed.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {!createdGroupName && (
+                <p className="text-xs text-muted-foreground">
+                  {participants.length === 0
+                    ? "Add phone numbers with country code (e.g., +1234567890)"
+                    : `${participants.length} participant${participants.length === 1 ? "" : "s"} added`}
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setOpen(false)}
-                data-testid="button-cancel-create-group"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createGroupMutation.isPending || participants.length === 0}
-                data-testid="button-submit-create-group"
-              >
-                {createGroupMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create Group"
-                )}
-              </Button>
+              {createdGroupName ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    form.reset();
+                    setParticipants([]);
+                    setFailedParticipants([]);
+                    setCreatedGroupName(null);
+                    setImagePreview(null);
+                    setImageBase64(null);
+                  }}
+                  data-testid="button-done-create-group"
+                >
+                  Done
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setOpen(false)}
+                    data-testid="button-cancel-create-group"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createGroupMutation.isPending || participants.length === 0}
+                    data-testid="button-submit-create-group"
+                  >
+                    {createGroupMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Group"
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </form>
         </Form>
