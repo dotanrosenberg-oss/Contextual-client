@@ -70,6 +70,7 @@ Tagline: "Intelligent Unification"
 - `GET /api/wa/customers` - List all customers
 - `GET /api/wa/customers/:id` - Get customer
 - `GET /api/wa/customers/:id/messages` - Get messages (local database)
+- `GET /api/wa/customers/:id/participants` - Get group participants (with optional `?includePhotos=true`)
 - `POST /api/wa/customers/:id/messages` - Send message
 - `POST /api/wa/customers/sync` - Sync customers from WhatsApp
 - `GET /api/wa/whatsapp/messages/:chatId` - Import historical messages from WhatsApp servers
@@ -107,6 +108,7 @@ All components use Shadcn UI primitives with consistent styling:
 - WebSocket handler caches incoming messages in real-time
 - Import history button in chat header to fetch historical messages from WhatsApp
 - Show last message preview when message history is not yet available
+- Added group participants panel - click member count to view group members with admin badges and search
 
 ## User Preferences
 - Professional, clean interface

@@ -141,10 +141,10 @@ function ChatView() {
                     <h2 className="font-medium text-sm">{selectedCustomer.name}</h2>
                     {selectedCustomer.participantCount ? (
                       <Button
-                        variant="link"
+                        variant="ghost"
                         size="sm"
                         onClick={() => setParticipantsOpen(true)}
-                        className="h-auto p-0 text-xs text-muted-foreground"
+                        className="h-auto px-0 py-0 text-xs text-muted-foreground font-normal"
                         data-testid="button-view-participants"
                       >
                         {selectedCustomer.participantCount} members
