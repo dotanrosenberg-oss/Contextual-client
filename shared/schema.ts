@@ -106,3 +106,14 @@ export const insertSocialIntegrationSchema = createInsertSchema(socialIntegratio
 
 export type InsertSocialIntegration = z.infer<typeof insertSocialIntegrationSchema>;
 export type SocialIntegration = typeof socialIntegrations.$inferSelect;
+
+export const participantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  phone: z.string(),
+  isAdmin: z.boolean(),
+  isSuperAdmin: z.boolean(),
+  profilePicUrl: z.string().nullable().optional(),
+});
+
+export type Participant = z.infer<typeof participantSchema>;
