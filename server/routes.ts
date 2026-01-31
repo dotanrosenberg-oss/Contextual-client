@@ -18,6 +18,7 @@ const sendMessageSchema = z.object({
 const createGroupSchema = z.object({
   name: z.string().min(1, "Group name cannot be empty"),
   participants: z.array(z.string()).min(1, "At least one participant required"),
+  image: z.string().optional(), // Base64 encoded image data
 });
 
 const checkNumberSchema = z.object({
