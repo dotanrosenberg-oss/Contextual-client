@@ -117,3 +117,19 @@ export const participantSchema = z.object({
 });
 
 export type Participant = z.infer<typeof participantSchema>;
+
+export const failedParticipants = pgTable("failed_participants", {
+  id: serial("id").primaryKey(),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFailedParticipantSchema = createInsertSchema(failedParticipants).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFailedParticipant = z.infer<typeof insertFailedParticipantSchema>;
+export type FailedParticipant = typeof failedParticipants.$inferSelect;

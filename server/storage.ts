@@ -13,12 +13,15 @@ import {
   type InsertContactInsight,
   type SocialIntegration,
   type InsertSocialIntegration,
+  type FailedParticipant,
+  type InsertFailedParticipant,
   users,
   settings,
   customers,
   messages,
   contactInsights,
   socialIntegrations,
+  failedParticipants,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -43,6 +46,10 @@ export interface IStorage {
 
   getSocialIntegrations(customerId: string): Promise<SocialIntegration[]>;
   saveSocialIntegration(integration: InsertSocialIntegration): Promise<SocialIntegration>;
+
+  getFailedParticipants(customerId: string): Promise<FailedParticipant[]>;
+  saveFailedParticipants(participants: InsertFailedParticipant[]): Promise<FailedParticipant[]>;
+  deleteFailedParticipant(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -152,6 +159,23 @@ export class DatabaseStorage implements IStorage {
   async saveSocialIntegration(integration: InsertSocialIntegration): Promise<SocialIntegration> {
     const [created] = await db.insert(socialIntegrations).values(integration).returning();
     return created;
+  }
+
+  async getFailedParticipants(customerId: string): Promise<FailedParticipant[]> {
+    return db
+      .select()
+      .from(failedParticipants)
+      .where(eq(failedParticipants.customerId, customerId));
+  }
+
+  async saveFailedParticipants(participants: InsertFailedParticipant[]): Promise<FailedParticipant[]> {
+    if (participants.length === 0) return [];
+    const created = await db.insert(failedParticipants).values(participants).returning();
+    return created;
+  }
+
+  async deleteFailedParticipant(id: number): Promise<void> {
+    await db.delete(failedParticipants).where(eq(failedParticipants.id, id));
   }
 }
 
