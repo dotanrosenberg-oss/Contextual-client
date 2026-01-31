@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiRequest, queryClient } from "./queryClient";
-import type { Customer, Message, ContactInsight } from "@shared/schema";
+import type { Customer, Message, ContactInsight, Participant } from "@shared/schema";
 import {
   getCachedMessages,
   cacheMessages,
@@ -300,6 +300,27 @@ interface ImportHistoryResponse {
   chatId: string;
   count: number;
   messages: Message[];
+}
+
+export function useGroupParticipants(groupId: string | null, includePhotos: boolean = false) {
+  return useQuery<Participant[]>({
+    queryKey: ["/api/wa/customers", groupId, "participants", includePhotos],
+    enabled: !!groupId,
+    staleTime: 60000,
+    queryFn: async (): Promise<Participant[]> => {
+      if (!groupId) return [];
+      const res = await fetch(
+        `/api/wa/customers/${encodeURIComponent(groupId)}/participants?includePhotos=${includePhotos}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      const data = await res.json();
+      return data.participants || [];
+    },
+  });
 }
 
 export function useImportHistory() {
