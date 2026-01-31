@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { AppSidebar } from "./components/app-sidebar";
@@ -20,6 +21,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ServiceUnavailableState } from "./components/ServiceUnavailableState";
 import { WhatsAppNotLinkedState } from "./components/WhatsAppNotLinkedState";
+import { ParticipantList } from "./components/ParticipantList";
 import { MessageSquare, AlertCircle, Settings, Download, Loader2 } from "lucide-react";
 import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +31,7 @@ import NotFound from "@/pages/not-found";
 function ChatView() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
   const queryClientInstance = useQueryClient();
   const { toast } = useToast();
 
@@ -136,11 +139,21 @@ function ChatView() {
                   <ContactAvatar name={selectedCustomer.name} size="sm" />
                   <div>
                     <h2 className="font-medium text-sm">{selectedCustomer.name}</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedCustomer.participantCount 
-                        ? `${selectedCustomer.participantCount} members` 
-                        : serviceConnectionStatus === "connected" ? "Online" : "Offline"}
-                    </p>
+                    {selectedCustomer.participantCount ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => setParticipantsOpen(true)}
+                        className="h-auto p-0 text-xs text-muted-foreground"
+                        data-testid="button-view-participants"
+                      >
+                        {selectedCustomer.participantCount} members
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {serviceConnectionStatus === "connected" ? "Online" : "Offline"}
+                      </p>
+                    )}
                   </div>
                 </>
               ) : (
@@ -273,6 +286,17 @@ function ChatView() {
       </main>
       
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      
+      <Sheet open={participantsOpen} onOpenChange={setParticipantsOpen}>
+        <SheetContent className="p-0 w-80 sm:w-96" data-testid="sheet-participants">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Group Participants</SheetTitle>
+          </SheetHeader>
+          {selectedCustomerId && (
+            <ParticipantList groupId={selectedCustomerId} includePhotos={true} />
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

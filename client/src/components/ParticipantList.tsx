@@ -27,7 +27,7 @@ function ParticipantItem({ participant }: { participant: Participant }) {
   
   return (
     <div
-      className="flex items-center gap-3 p-3 rounded-md hover-elevate"
+      className="flex items-center gap-3 p-3 rounded-md"
       data-testid={`participant-item-${participant.id}`}
     >
       <ContactAvatar
@@ -46,14 +46,13 @@ function ParticipantItem({ participant }: { participant: Participant }) {
           )}
         </div>
         {participant.phone && (
-          <a
-            href={`tel:+${participant.phone}`}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          <div
+            className="flex items-center gap-1 text-xs text-muted-foreground"
             data-testid={`participant-phone-${participant.id}`}
           >
             <Phone className="h-3 w-3" />
             <span>{formatPhoneNumber(participant.phone)}</span>
-          </a>
+          </div>
         )}
       </div>
     </div>

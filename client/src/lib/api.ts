@@ -302,24 +302,16 @@ interface ImportHistoryResponse {
   messages: Message[];
 }
 
+interface ParticipantsResponse {
+  participants: Participant[];
+}
+
 export function useGroupParticipants(groupId: string | null, includePhotos: boolean = false) {
-  return useQuery<Participant[]>({
-    queryKey: ["/api/wa/customers", groupId, "participants", includePhotos],
+  return useQuery<ParticipantsResponse, Error, Participant[]>({
+    queryKey: [`/api/wa/customers/${groupId}/participants?includePhotos=${includePhotos}`],
     enabled: !!groupId,
     staleTime: 60000,
-    queryFn: async (): Promise<Participant[]> => {
-      if (!groupId) return [];
-      const res = await fetch(
-        `/api/wa/customers/${encodeURIComponent(groupId)}/participants?includePhotos=${includePhotos}`,
-        { credentials: "include" }
-      );
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      const data = await res.json();
-      return data.participants || [];
-    },
+    select: (data) => data.participants || [],
   });
 }
 
