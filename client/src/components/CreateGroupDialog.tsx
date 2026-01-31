@@ -163,9 +163,12 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         setParticipants(prev => prev.filter(p => failedNumberSet.has(p)));
         
         // Save failed participants to database for display in participant list
-        if (result.groupId) {
+        // Check for groupId or fallback to customer.id
+        const groupIdentifier = result.groupId || result.customer?.id;
+        console.log("Group creation result:", result, "Using groupId:", groupIdentifier);
+        if (groupIdentifier) {
           saveFailedParticipantsMutation.mutate({
-            customerId: result.groupId,
+            customerId: groupIdentifier,
             participants: failedNumbers.map(f => ({
               phoneNumber: f.number,
               reason: f.reason || "unknown reason",
