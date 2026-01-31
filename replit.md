@@ -41,6 +41,7 @@ Tagline: "Intelligent Unification"
 3. **messages** - Chat message history
 4. **contactInsights** - AI-generated insights per customer
 5. **socialIntegrations** - Social platform connections (future)
+6. **failedParticipants** - Tracks participants that failed to be added to groups (phone number, reason, dismissable)
 
 ## Features
 
@@ -110,6 +111,7 @@ All components use Shadcn UI primitives with consistent styling:
 - Show last message preview when message history is not yet available
 - Added group participants panel - click member count to view group members with admin badges and search
 - Added group creation dialog - create new groups with name, image, and phone numbers from the sidebar
+- Failed participants persistence - when group creation has failures, they are saved to the database and displayed in the participant list with strikethrough styling, reason, and ability to dismiss
 
 ## User Preferences
 - Professional, clean interface
