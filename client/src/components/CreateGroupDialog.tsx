@@ -140,10 +140,22 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         image: imageBase64 || undefined,
       });
       
-      toast({
-        title: "Group created",
-        description: `"${result.groupName}" created with ${result.summary?.successfullyAdded || 0} members`,
-      });
+      const successCount = result.summary?.successfullyAdded || 0;
+      const failedNumbers = result.results?.failed || [];
+      
+      if (failedNumbers.length > 0) {
+        const failedList = failedNumbers.map(f => f.number).join(", ");
+        toast({
+          title: "Group created with some issues",
+          description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}. Could not add: ${failedList}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Group created",
+          description: `"${result.groupName}" created with ${successCount} member${successCount === 1 ? "" : "s"}`,
+        });
+      }
       
       setOpen(false);
       form.reset();
