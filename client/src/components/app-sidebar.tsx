@@ -46,9 +46,17 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredCustomers = customers.filter((customer) =>
-    customer.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCustomers = customers
+    .filter((customer) =>
+      customer.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const rawTimeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const rawTimeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      const timeA = Number.isFinite(rawTimeA) ? rawTimeA : 0;
+      const timeB = Number.isFinite(rawTimeB) ? rawTimeB : 0;
+      return timeB - timeA;
+    });
 
   return (
     <Sidebar data-testid="app-sidebar">
