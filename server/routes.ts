@@ -287,6 +287,27 @@ export async function registerRoutes(
     }
     
     const { status, data } = await makeWaRequest("GET", path);
+    
+    if (status === 200 && data && typeof data === "object" && "messages" in data) {
+      const messages = (data as { messages: Array<{ fromPhone?: string | null; fromName?: string | null }> }).messages;
+      
+      const seen = new Set<string>();
+      for (const msg of messages) {
+        if (msg.fromPhone && msg.fromName && !seen.has(msg.fromPhone)) {
+          seen.add(msg.fromPhone);
+          try {
+            await storage.upsertContact({
+              phone: msg.fromPhone,
+              name: msg.fromName,
+              profilePicUrl: null,
+            });
+          } catch (err) {
+            console.error("Failed to save contact from message:", err);
+          }
+        }
+      }
+    }
+    
     res.status(status).json(data);
   });
 
@@ -334,6 +355,25 @@ export async function registerRoutes(
     
     const path = `/api/customers/${encodeURIComponent(id)}/participants?includePhotos=${includePhotos}`;
     const { status, data } = await makeWaRequest("GET", path);
+    
+    if (status === 200 && data && typeof data === "object" && "participants" in data) {
+      const participants = (data as { participants: Array<{ phone?: string; name?: string; profilePicUrl?: string | null }> }).participants;
+      
+      for (const participant of participants) {
+        if (participant.phone && participant.name) {
+          try {
+            await storage.upsertContact({
+              phone: participant.phone,
+              name: participant.name,
+              profilePicUrl: participant.profilePicUrl || null,
+            });
+          } catch (err) {
+            console.error("Failed to save contact:", err);
+          }
+        }
+      }
+    }
+    
     res.status(status).json(data);
   });
 
