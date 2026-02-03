@@ -15,6 +15,8 @@ import {
   type InsertSocialIntegration,
   type FailedParticipant,
   type InsertFailedParticipant,
+  type Contact,
+  type InsertContact,
   users,
   settings,
   customers,
@@ -22,6 +24,7 @@ import {
   contactInsights,
   socialIntegrations,
   failedParticipants,
+  contacts,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -50,6 +53,10 @@ export interface IStorage {
   getFailedParticipants(customerId: string): Promise<FailedParticipant[]>;
   saveFailedParticipants(participants: InsertFailedParticipant[]): Promise<FailedParticipant[]>;
   deleteFailedParticipant(id: number): Promise<void>;
+
+  getContacts(): Promise<Contact[]>;
+  getContactByPhone(phone: string): Promise<Contact | undefined>;
+  upsertContact(contact: InsertContact): Promise<Contact>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -176,6 +183,29 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFailedParticipant(id: number): Promise<void> {
     await db.delete(failedParticipants).where(eq(failedParticipants.id, id));
+  }
+
+  async getContacts(): Promise<Contact[]> {
+    return db.select().from(contacts);
+  }
+
+  async getContactByPhone(phone: string): Promise<Contact | undefined> {
+    const [contact] = await db.select().from(contacts).where(eq(contacts.phone, phone));
+    return contact;
+  }
+
+  async upsertContact(contact: InsertContact): Promise<Contact> {
+    const existing = await this.getContactByPhone(contact.phone);
+    if (existing) {
+      const [updated] = await db
+        .update(contacts)
+        .set({ ...contact, lastSeen: new Date() })
+        .where(eq(contacts.phone, contact.phone))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(contacts).values(contact).returning();
+    return created;
   }
 }
 

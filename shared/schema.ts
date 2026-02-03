@@ -133,3 +133,21 @@ export const insertFailedParticipantSchema = createInsertSchema(failedParticipan
 
 export type InsertFailedParticipant = z.infer<typeof insertFailedParticipantSchema>;
 export type FailedParticipant = typeof failedParticipants.$inferSelect;
+
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  phone: text("phone").notNull().unique(),
+  name: text("name").notNull(),
+  profilePicUrl: text("profile_pic_url"),
+  firstSeen: timestamp("first_seen").defaultNow(),
+  lastSeen: timestamp("last_seen").defaultNow(),
+});
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  firstSeen: true,
+  lastSeen: true,
+});
+
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type Contact = typeof contacts.$inferSelect;
