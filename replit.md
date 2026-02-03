@@ -42,6 +42,7 @@ Tagline: "Intelligent Unification"
 4. **contactInsights** - AI-generated insights per customer
 5. **socialIntegrations** - Social platform connections (future)
 6. **failedParticipants** - Tracks participants that failed to be added to groups (phone number, reason, dismissable)
+7. **contacts** - Repository of all WhatsApp users (phone unique, name, profilePicUrl) extracted from group participants and message senders
 
 ## Features
 
@@ -80,6 +81,10 @@ Tagline: "Intelligent Unification"
 - `POST /api/insights/generate` - Generate AI insights for a customer
 - `GET /api/insights/:customerId` - Get stored insights
 
+### Contacts
+- `GET /api/contacts` - List all contacts
+- `GET /api/contacts/:phone` - Get contact by phone number
+
 ### WebSocket
 - `/ws?apiKey=KEY` - Real-time updates (requires authentication)
 
@@ -112,6 +117,9 @@ All components use Shadcn UI primitives with consistent styling:
 - Added group participants panel - click member count to view group members with admin badges and search
 - Added group creation dialog - create new groups with name, image, and phone numbers from the sidebar
 - Failed participants persistence - when group creation has failures, they are saved to the database and displayed in the participant list with strikethrough styling, reason, and ability to dismiss
+- Added Contacts page - browse all WhatsApp users extracted from groups and messages with search functionality
+- Contacts are automatically extracted from group participants and message senders during WhatsApp sync
+- Group permission settings panel - UI-only WhatsApp-style toggles for group admin settings
 
 ## User Preferences
 - Professional, clean interface
