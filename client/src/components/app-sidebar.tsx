@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Search, Settings, AlertCircle, Smartphone } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Search, Settings, AlertCircle, Smartphone, Users } from "lucide-react";
 import logoImage from "@assets/Gemini_Generated_Image_f014s7f014s7f014_1769729881969.png";
 import {
   Sidebar,
@@ -45,6 +46,7 @@ export function AppSidebar({
   isWhatsAppNotLinked = false,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [location] = useLocation();
 
   const filteredCustomers = customers
     .filter((customer) =>
@@ -144,6 +146,18 @@ export function AppSidebar({
         <CreateGroupDialog disabled={serviceStatus !== "connected"} />
         <SyncButton disabled={serviceStatus !== "connected"} />
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location === "/contacts"}
+              data-testid="button-contacts"
+            >
+              <Link href="/contacts">
+                <Users className="h-4 w-4" />
+                <span>Contacts</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={onSettingsClick}

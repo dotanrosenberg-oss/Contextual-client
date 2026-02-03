@@ -513,5 +513,30 @@ Respond in JSON format with the following structure:
     }
   });
 
+  // Contacts routes
+  app.get("/api/contacts", async (_req: Request, res: Response) => {
+    try {
+      const contactList = await storage.getContacts();
+      res.json({ contacts: contactList });
+    } catch (error) {
+      console.error("Failed to get contacts:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve contacts" });
+    }
+  });
+
+  app.get("/api/contacts/:phone", async (req: Request, res: Response) => {
+    try {
+      const { phone } = req.params;
+      const contact = await storage.getContactByPhone(phone);
+      if (!contact) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error) {
+      console.error("Failed to get contact:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve contact" });
+    }
+  });
+
   return httpServer;
 }

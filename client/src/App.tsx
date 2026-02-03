@@ -27,6 +27,7 @@ import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "./hooks/useWebSocket";
 import NotFound from "@/pages/not-found";
+import ContactsPage from "@/pages/contacts";
 
 function ChatView() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -301,10 +302,84 @@ function ChatView() {
   );
 }
 
+function ContactsWrapper() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { data: serverStatus, isLoading: serverStatusLoading, error: serverStatusError } = useServerStatus();
+  const { data: settings, isLoading: settingsLoading } = useSettings();
+
+  const isServiceConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
+  const isServerReachable = !serverStatusError && serverStatus !== undefined;
+
+  const getServerStatus = (): "connected" | "disconnected" | "connecting" => {
+    if (!settings?.configured) return "disconnected";
+    if (serverStatusLoading) return "connecting";
+    if (isServerReachable) return "connected";
+    return "disconnected";
+  };
+
+  const getServiceStatus = (): "connected" | "disconnected" | "connecting" => {
+    if (!settings?.configured) return "disconnected";
+    if (serverStatusLoading) return "connecting";
+    if (isServiceConnected) return "connected";
+    return "disconnected";
+  };
+
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen w-full">
+        <Skeleton className="h-10 w-40" />
+      </div>
+    );
+  }
+
+  if (!settings?.configured) {
+    return <WelcomeScreen />;
+  }
+
+  return (
+    <>
+      <AppSidebar
+        customers={[]}
+        selectedCustomerId={null}
+        serverStatus={getServerStatus()}
+        serviceStatus={getServiceStatus()}
+        onSettingsClick={() => setSettingsOpen(true)}
+        isLoading={false}
+      />
+      <main className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 min-w-0">
+          <header className="flex items-center justify-between gap-2 p-3 border-b bg-background">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <h2 className="font-medium">Contacts</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSettingsOpen(true)}
+                data-testid="button-header-settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <ThemeToggle />
+            </div>
+          </header>
+          <div className="flex-1 overflow-hidden">
+            <ContactsPage />
+          </div>
+        </div>
+      </main>
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+    </>
+  );
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/" component={ChatView} />
+      <Route path="/contacts" component={ContactsWrapper} />
       <Route component={NotFound} />
     </Switch>
   );
