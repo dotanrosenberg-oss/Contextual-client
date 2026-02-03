@@ -564,6 +564,45 @@ Respond in JSON format with the following structure:
     }
   });
 
+  app.post("/api/contacts/sync", async (_req: Request, res: Response) => {
+    try {
+      const customers = await storage.getCustomers();
+      const groups = customers.filter(c => c.id.includes("@g.us"));
+      
+      let totalSynced = 0;
+      
+      for (const group of groups) {
+        const path = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=true`;
+        const { status, data } = await makeWaRequest("GET", path);
+        
+        if (status === 200 && data && typeof data === "object" && "participants" in data) {
+          const participants = (data as { participants: Array<{ phone?: string; name?: string; profilePicUrl?: string | null }> }).participants;
+          
+          for (const participant of participants) {
+            if (participant.phone && participant.name) {
+              try {
+                await storage.upsertContact({
+                  phone: participant.phone,
+                  name: participant.name,
+                  profilePicUrl: participant.profilePicUrl || null,
+                });
+                totalSynced++;
+              } catch (err) {
+                console.error("Failed to save contact:", err);
+              }
+            }
+          }
+        }
+      }
+      
+      const contactList = await storage.getContacts();
+      res.json({ success: true, synced: totalSynced, contacts: contactList });
+    } catch (error) {
+      console.error("Failed to sync contacts:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to sync contacts" });
+    }
+  });
+
   app.get("/api/contacts/:phone", async (req: Request, res: Response) => {
     try {
       const { phone } = req.params;
