@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Search, Users, RefreshCw } from "lucide-react";
+import { Search, Users, RefreshCw, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,7 +53,19 @@ export default function ContactsPage() {
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-semibold">Contacts</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Back to conversations"
+                data-testid="button-back-to-conversations"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <h1 className="text-xl font-semibold">Contacts</h1>
+          </div>
           <Button
             variant="outline"
             size="sm"
