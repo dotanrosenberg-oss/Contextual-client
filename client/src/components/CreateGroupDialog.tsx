@@ -26,7 +26,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useCreateGroup, useSaveFailedParticipants } from "@/lib/api";
+import { useCreateGroup, useSaveFailedParticipants, CreateGroupValidationError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const createGroupFormSchema = z.object({
@@ -224,11 +224,22 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         setGroupSettings(defaultGroupSettings);
       }
     } catch (error) {
-      toast({
-        title: "Failed to create group",
-        description: (error as Error).message,
-        variant: "destructive",
-      });
+      if (error instanceof CreateGroupValidationError) {
+        setFailedParticipants(error.failedParticipants.map(f => ({
+          number: f.number,
+          reason: f.reason || "Not registered on WhatsApp or doesn't allow group invites"
+        })));
+        toast({
+          title: "Invalid phone numbers",
+          description: "Some phone numbers couldn't be verified. Please check the numbers highlighted below.",
+        });
+      } else {
+        toast({
+          title: "Failed to create group",
+          description: (error as Error).message,
+          variant: "destructive",
+        });
+      }
     }
   };
 

@@ -347,23 +347,35 @@ interface CreateGroupErrorResponse {
   };
 }
 
-function parseCreateGroupError(data: CreateGroupErrorResponse): string {
+export class CreateGroupValidationError extends Error {
+  public failedParticipants: { number: string; reason: string }[];
+  public errorType: string;
+  
+  constructor(message: string, failedParticipants: { number: string; reason: string }[], errorType: string) {
+    super(message);
+    this.name = "CreateGroupValidationError";
+    this.failedParticipants = failedParticipants;
+    this.errorType = errorType;
+  }
+}
+
+function parseCreateGroupError(data: CreateGroupErrorResponse): Error {
   if (data.error === "ALL_PARTICIPANTS_FAILED") {
     const failedNumbers = data.results?.failed || [];
+    let message = "No participants could be added to the group.";
     if (failedNumbers.length === 1) {
-      return `The phone number ${failedNumbers[0].number} is not registered on WhatsApp or doesn't allow group invites.`;
+      message = `The phone number ${failedNumbers[0].number} is not registered on WhatsApp or doesn't allow group invites.`;
+    } else if (failedNumbers.length > 0) {
+      message = `None of the phone numbers could be added. They may not be registered on WhatsApp or don't allow group invites.`;
     }
-    if (failedNumbers.length > 0) {
-      return `None of the phone numbers could be added. They may not be registered on WhatsApp or don't allow group invites.`;
-    }
-    return "No participants could be added to the group. Please verify the phone numbers are registered on WhatsApp.";
+    return new CreateGroupValidationError(message, failedNumbers, data.error);
   }
   
   if (data.message) {
-    return data.message;
+    return new Error(data.message);
   }
   
-  return "Failed to create group. Please try again.";
+  return new Error("Failed to create group. Please try again.");
 }
 
 export function useCreateGroup() {
@@ -381,7 +393,7 @@ export function useCreateGroup() {
       const data = await res.json();
       
       if (!res.ok || data.success === false) {
-        throw new Error(parseCreateGroupError(data));
+        throw parseCreateGroupError(data);
       }
       
       return data;
