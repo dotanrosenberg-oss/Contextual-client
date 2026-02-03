@@ -566,24 +566,38 @@ Respond in JSON format with the following structure:
 
   app.post("/api/contacts/sync", async (_req: Request, res: Response) => {
     try {
-      const customers = await storage.getCustomers();
-      const groups = customers.filter(c => c.id.includes("@g.us"));
+      const { status: customersStatus, data: customersData } = await makeWaRequest("GET", "/api/customers");
+      
+      if (customersStatus !== 200 || !customersData || !Array.isArray(customersData)) {
+        console.log(`[contacts-sync] Failed to fetch customers: status ${customersStatus}`);
+        return res.status(500).json({ error: "FETCH_ERROR", message: "Failed to fetch customers from WhatsApp" });
+      }
+      
+      const groups = customersData.filter((c: { id?: string }) => c.id?.includes("@g.us"));
       
       let totalSynced = 0;
+      let groupsProcessed = 0;
+      
+      console.log(`[contacts-sync] Found ${groups.length} groups to process`);
       
       for (const group of groups) {
-        const path = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=true`;
+        const path = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
         const { status, data } = await makeWaRequest("GET", path);
         
+        groupsProcessed++;
+        
         if (status === 200 && data && typeof data === "object" && "participants" in data) {
-          const participants = (data as { participants: Array<{ phone?: string; name?: string; profilePicUrl?: string | null }> }).participants;
+          const participants = (data as { participants: Array<{ phone?: string; name?: string; pushName?: string; profilePicUrl?: string | null }> }).participants;
           
           for (const participant of participants) {
-            if (participant.phone && participant.name) {
+            const phone = participant.phone;
+            const name = participant.name || participant.pushName || phone;
+            
+            if (phone && name) {
               try {
                 await storage.upsertContact({
-                  phone: participant.phone,
-                  name: participant.name,
+                  phone: phone,
+                  name: name,
                   profilePicUrl: participant.profilePicUrl || null,
                 });
                 totalSynced++;
@@ -592,8 +606,12 @@ Respond in JSON format with the following structure:
               }
             }
           }
+        } else if (status !== 200) {
+          console.log(`[contacts-sync] Group ${group.id} returned status ${status}`);
         }
       }
+      
+      console.log(`[contacts-sync] Processed ${groupsProcessed} groups, synced ${totalSynced} contacts`);
       
       const contactList = await storage.getContacts();
       res.json({ success: true, synced: totalSynced, contacts: contactList });
