@@ -460,11 +460,21 @@ export async function registerRoutes(
         const data = await response.json().catch(() => ({})) as Record<string, unknown>;
         
         // If group creation was successful and we have an icon, save the customer with avatar
-        if (response.ok && data.groupId && savedIconPath) {
+        // Handle different response key formats (groupId, id, customer.id)
+        const groupId = (data.groupId as string) || 
+                       (data.id as string) || 
+                       ((data.customer as { id?: string })?.id) ||
+                       null;
+        
+        if (response.ok && groupId && savedIconPath) {
+          const groupName = (data.groupName as string) || 
+                           (data.name as string) || 
+                           ((data.customer as { name?: string })?.name) ||
+                           req.body.name;
           try {
             await storage.upsertCustomer({
-              id: data.groupId as string,
-              name: (data.groupName as string) || req.body.name,
+              id: groupId,
+              name: groupName,
               avatarUrl: savedIconPath,
               participantCount: (data.customer as { participantCount?: number })?.participantCount || 1,
             });
