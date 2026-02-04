@@ -7,6 +7,8 @@ import { storage } from "./storage";
 import { z } from "zod";
 import multer from "multer";
 import FormData from "form-data";
+import * as fs from "fs";
+import * as path from "path";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -266,6 +268,22 @@ export async function registerRoutes(
 
   app.get("/api/wa/customers", async (_req: Request, res: Response) => {
     const { status, data } = await makeWaRequest("GET", "/api/customers");
+    
+    // Merge with local avatar data
+    if (status === 200 && Array.isArray(data)) {
+      const localCustomers = await storage.getCustomers();
+      const avatarMap = new Map(
+        localCustomers.filter(c => c.avatarUrl).map(c => [c.id, c.avatarUrl])
+      );
+      
+      const enrichedData = data.map((customer: { id: string; avatarUrl?: string | null }) => ({
+        ...customer,
+        avatarUrl: avatarMap.get(customer.id) || customer.avatarUrl || null,
+      }));
+      
+      return res.status(status).json(enrichedData);
+    }
+    
     res.status(status).json(data);
   });
 
@@ -384,6 +402,7 @@ export async function registerRoutes(
     }
     
     const url = `${settings.baseUrl}/api/groups/create`;
+    let savedIconPath: string | null = null;
     
     if (req.file) {
       // Handle multipart form data with icon
@@ -412,6 +431,22 @@ export async function registerRoutes(
         contentType: req.file.mimetype,
       });
       
+      // Save icon locally for display
+      const iconFilename = `${Date.now()}-${req.file.originalname}`;
+      const iconDir = path.join(process.cwd(), "uploads", "group-icons");
+      const iconPath = path.join(iconDir, iconFilename);
+      
+      try {
+        // Ensure directory exists
+        if (!fs.existsSync(iconDir)) {
+          fs.mkdirSync(iconDir, { recursive: true });
+        }
+        fs.writeFileSync(iconPath, req.file.buffer);
+        savedIconPath = `/uploads/group-icons/${iconFilename}`;
+      } catch (err) {
+        console.error("Failed to save icon locally:", err);
+      }
+      
       try {
         const response = await fetch(url, {
           method: "POST",
@@ -422,7 +457,22 @@ export async function registerRoutes(
           body: formData.getBuffer(),
         });
         
-        const data = await response.json().catch(() => ({}));
+        const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+        
+        // If group creation was successful and we have an icon, save the customer with avatar
+        if (response.ok && data.groupId && savedIconPath) {
+          try {
+            await storage.upsertCustomer({
+              id: data.groupId as string,
+              name: (data.groupName as string) || req.body.name,
+              avatarUrl: savedIconPath,
+              participantCount: (data.customer as { participantCount?: number })?.participantCount || 1,
+            });
+          } catch (err) {
+            console.error("Failed to save customer with avatar:", err);
+          }
+        }
+        
         return res.status(response.status).json(data);
       } catch (error) {
         console.error("WhatsApp server request failed:", error);
