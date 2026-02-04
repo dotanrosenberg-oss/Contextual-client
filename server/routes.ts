@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { IncomingMessage } from "http";
 import OpenAI from "openai";
+import FormData from "form-data";
 import { storage } from "./storage";
 import { z } from "zod";
 
@@ -82,6 +83,35 @@ async function makeWaRequest(
     return { status: response.status, data };
   } catch (error) {
     console.error("WhatsApp server request failed:", error);
+    return { status: 503, data: { error: "CONNECTION_FAILED", message: "Failed to connect to WhatsApp server" } };
+  }
+}
+
+async function makeWaMultipartRequest(
+  path: string,
+  formData: FormData
+): Promise<{ status: number; data: unknown }> {
+  const settings = await getWaSettings();
+  if (!settings) {
+    return { status: 503, data: { error: "SETTINGS_NOT_CONFIGURED", message: "WhatsApp server settings not configured" } };
+  }
+
+  const url = `${settings.baseUrl}${path}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "X-API-Key": settings.apiKey,
+        ...formData.getHeaders(),
+      },
+      body: formData.getBuffer(),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    return { status: response.status, data };
+  } catch (error) {
+    console.error("WhatsApp server multipart request failed:", error);
     return { status: 503, data: { error: "CONNECTION_FAILED", message: "Failed to connect to WhatsApp server" } };
   }
 }
@@ -334,17 +364,38 @@ export async function registerRoutes(
     }
     const { id } = req.params;
     
-    const payload: Record<string, unknown> = {};
-    
-    if (parsed.data.message.trim()) {
-      payload.message = parsed.data.message;
-    }
-    
+    // If there's an attachment, use multipart form data
     if (parsed.data.attachment) {
-      payload.attachment = parsed.data.attachment;
+      const { data: base64Data, mimetype, filename } = parsed.data.attachment;
+      
+      // Convert base64 to buffer
+      const fileBuffer = Buffer.from(base64Data, "base64");
+      
+      // Create FormData
+      const formData = new FormData();
+      formData.append("file", fileBuffer, {
+        filename,
+        contentType: mimetype,
+      });
+      
+      // Add caption if there's a message
+      if (parsed.data.message.trim()) {
+        formData.append("caption", parsed.data.message);
+      }
+      
+      const { status, data } = await makeWaMultipartRequest(
+        `/api/customers/${encodeURIComponent(id)}/messages`,
+        formData
+      );
+      return res.status(status).json(data);
     }
     
-    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, payload);
+    // Text-only message - use JSON
+    const { status, data } = await makeWaRequest(
+      "POST",
+      `/api/customers/${encodeURIComponent(id)}/messages`,
+      { message: parsed.data.message }
+    );
     res.status(status).json(data);
   });
 
