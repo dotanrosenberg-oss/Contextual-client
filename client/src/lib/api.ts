@@ -563,3 +563,34 @@ export function useDeleteFailedParticipant() {
     },
   });
 }
+
+interface UpdateGroupSettingsPayload {
+  customerId: string;
+  settings: GroupSettings;
+}
+
+interface UpdateGroupSettingsResponse {
+  membersCanEditSettings: boolean;
+  membersCanSendMessages: boolean;
+  membersCanAddMembers: boolean;
+}
+
+export function useUpdateGroupSettings() {
+  return useMutation<UpdateGroupSettingsResponse, Error, UpdateGroupSettingsPayload>({
+    mutationFn: async ({ customerId, settings }) => {
+      const res = await fetch(`/api/wa/customers/${encodeURIComponent(customerId)}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || "Failed to update group settings");
+      }
+      
+      return res.json();
+    },
+  });
+}

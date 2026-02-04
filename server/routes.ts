@@ -546,6 +546,26 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
+  // Update group settings
+  const groupSettingsSchema = z.object({
+    membersCanEditSettings: z.boolean().optional(),
+    membersCanSendMessages: z.boolean().optional(),
+    membersCanAddMembers: z.boolean().optional(),
+  });
+
+  app.patch("/api/wa/customers/:id/settings", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const parsed = groupSettingsSchema.safeParse(req.body);
+    
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+    }
+    
+    const path = `/api/customers/${encodeURIComponent(id)}/settings`;
+    const { status, data } = await makeWaRequest("PATCH", path, parsed.data);
+    res.status(status).json(data);
+  });
+
   // AI Insights route
   const generateInsightsSchema = z.object({
     customerId: z.string(),
