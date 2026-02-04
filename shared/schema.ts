@@ -64,9 +64,6 @@ export const messages = pgTable("messages", {
   isFromMe: boolean("is_from_me").default(false),
   hasMedia: boolean("has_media").default(false),
   messageType: text("message_type").default("text"),
-  mediaUrl: text("media_url"),
-  mimetype: text("mimetype"),
-  filename: text("filename"),
 });
 
 export const insertMessageSchema = createInsertSchema(messages);

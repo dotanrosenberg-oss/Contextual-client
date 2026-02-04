@@ -126,8 +126,6 @@ All components use Shadcn UI primitives with consistent styling:
 - MessageBubble component updated to display incoming media attachments
 - Group settings now passed to WhatsApp server when creating groups (membersCanEditSettings, membersCanSendMessages, membersCanAddMembers)
 - Disabled "Admins approve new members" toggle (not supported by WhatsApp API)
-- Server now sends attachments as multipart/form-data to WhatsApp server (converts base64 to file buffer)
-- Added media_url, mimetype, and filename columns to messages table for storing incoming media
 
 ## User Preferences
 - Professional, clean interface
