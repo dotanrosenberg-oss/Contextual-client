@@ -154,21 +154,57 @@ export function useMessages(customerId: string | null) {
   return query;
 }
 
+interface AttachmentData {
+  file: File;
+  preview: string | null;
+  type: "image" | "video" | "audio" | "document";
+}
+
 interface SendMessageVariables {
   customerId: string;
   message: string;
+  attachment?: AttachmentData;
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export function useSendMessage() {
   const queryClient = useQueryClient();
   
   return useMutation<SendMessageResponse, Error, SendMessageVariables>({
-    mutationFn: async ({ customerId, message }: SendMessageVariables) => {
+    mutationFn: async ({ customerId, message, attachment }: SendMessageVariables) => {
       if (!customerId) throw new Error("No customer selected");
+      
+      let body: Record<string, unknown> = { message };
+      
+      if (attachment) {
+        const base64Data = await fileToBase64(attachment.file);
+        body = {
+          ...body,
+          attachment: {
+            data: base64Data,
+            mimetype: attachment.file.type,
+            filename: attachment.file.name,
+            type: attachment.type,
+          },
+        };
+      }
+      
       const res = await apiRequest(
         "POST",
         `/api/wa/customers/${encodeURIComponent(customerId)}/messages`,
-        { message }
+        body
       );
       return res.json();
     },

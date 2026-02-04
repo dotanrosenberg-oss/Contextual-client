@@ -11,9 +11,20 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const sendMessageSchema = z.object({
-  message: z.string().min(1, "Message cannot be empty"),
+const attachmentSchema = z.object({
+  data: z.string(),
+  mimetype: z.string(),
+  filename: z.string(),
+  type: z.enum(["image", "video", "audio", "document"]),
 });
+
+const sendMessageSchema = z.object({
+  message: z.string(),
+  attachment: attachmentSchema.optional(),
+}).refine(
+  (data) => data.message.trim().length > 0 || data.attachment !== undefined,
+  { message: "Either message or attachment is required" }
+);
 
 const createGroupSchema = z.object({
   name: z.string().min(1, "Group name cannot be empty"),
@@ -317,7 +328,18 @@ export async function registerRoutes(
       return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
     }
     const { id } = req.params;
-    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, parsed.data);
+    
+    const payload: Record<string, unknown> = {};
+    
+    if (parsed.data.message.trim()) {
+      payload.message = parsed.data.message;
+    }
+    
+    if (parsed.data.attachment) {
+      payload.attachment = parsed.data.attachment;
+    }
+    
+    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, payload);
     res.status(status).json(data);
   });
 

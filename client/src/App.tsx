@@ -24,6 +24,7 @@ import { WhatsAppNotLinkedState } from "./components/WhatsAppNotLinkedState";
 import { ParticipantList } from "./components/ParticipantList";
 import { MessageSquare, AlertCircle, Settings, Download, Loader2 } from "lucide-react";
 import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
+import type { Attachment } from "./components/MessageInput";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "./hooks/useWebSocket";
 import NotFound from "@/pages/not-found";
@@ -85,13 +86,22 @@ function ChatView() {
   const isServerUnreachable = settings?.configured && !serverStatusLoading && serverStatusError;
   const isWhatsAppNotLinked = settings?.configured && !serverStatusLoading && !serverStatusError && serverStatus && !isServiceConnected;
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, attachment?: Attachment) => {
     if (!selectedCustomerId) return;
     
     try {
-      await sendMessageMutation.mutateAsync({ customerId: selectedCustomerId, message });
+      await sendMessageMutation.mutateAsync({ 
+        customerId: selectedCustomerId, 
+        message: message || (attachment ? "" : message),
+        attachment,
+      });
     } catch (error) {
       console.error("Failed to send message:", error);
+      toast({
+        title: "Failed to send message",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -255,6 +265,8 @@ function ChatView() {
                           timestamp={message.timestamp}
                           isFromMe={message.isFromMe ?? false}
                           senderName={message.fromName}
+                          hasMedia={message.hasMedia ?? false}
+                          messageType={message.messageType}
                         />
                       ))
                     )}
