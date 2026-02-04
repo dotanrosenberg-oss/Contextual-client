@@ -62,7 +62,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
   const [failedParticipants, setFailedParticipants] = useState<FailedParticipant[]>([]);
   const [phoneInput, setPhoneInput] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
   const [createdGroupName, setCreatedGroupName] = useState<string | null>(null);
   const [groupSettings, setGroupSettings] = useState<GroupSettings>(defaultGroupSettings);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,18 +131,21 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
       return;
     }
     
+    // Store the actual file for upload
+    setIconFile(file);
+    
+    // Create preview URL
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
       setImagePreview(result);
-      setImageBase64(result.split(",")[1]);
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
     setImagePreview(null);
-    setImageBase64(null);
+    setIconFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -162,7 +165,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
       const result = await createGroupMutation.mutateAsync({
         name: values.name,
         participants,
-        image: imageBase64 || undefined,
+        iconFile: iconFile || undefined,
         settings: {
           membersCanEditSettings: groupSettings.membersCanEditGroupSettings,
           membersCanSendMessages: groupSettings.membersCanSendMessages,
@@ -223,7 +226,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         setFailedParticipants([]);
         setCreatedGroupName(null);
         setImagePreview(null);
-        setImageBase64(null);
+        setIconFile(null);
         setGroupSettings(defaultGroupSettings);
       }
     } catch (error) {
@@ -543,7 +546,7 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
                     setFailedParticipants([]);
                     setCreatedGroupName(null);
                     setImagePreview(null);
-                    setImageBase64(null);
+                    setIconFile(null);
                     setGroupSettings(defaultGroupSettings);
                   }}
                   data-testid="button-done-create-group"

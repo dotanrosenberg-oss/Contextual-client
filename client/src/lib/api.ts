@@ -351,7 +351,7 @@ interface GroupSettings {
 interface CreateGroupPayload {
   name: string;
   participants: string[];
-  image?: string;
+  iconFile?: File;
   settings?: GroupSettings;
 }
 
@@ -422,12 +422,36 @@ export function useCreateGroup() {
   
   return useMutation<CreateGroupResponse, Error, CreateGroupPayload>({
     mutationFn: async (payload) => {
-      const res = await fetch("/api/wa/groups/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        credentials: "include",
-      });
+      let res: Response;
+      
+      if (payload.iconFile) {
+        // Use FormData when there's an icon file
+        const formData = new FormData();
+        formData.append("name", payload.name);
+        formData.append("participants", JSON.stringify(payload.participants));
+        if (payload.settings) {
+          formData.append("settings", JSON.stringify(payload.settings));
+        }
+        formData.append("icon", payload.iconFile);
+        
+        res = await fetch("/api/wa/groups/create", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+      } else {
+        // Use JSON when there's no icon
+        res = await fetch("/api/wa/groups/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: payload.name,
+            participants: payload.participants,
+            settings: payload.settings,
+          }),
+          credentials: "include",
+        });
+      }
       
       const data = await res.json();
       

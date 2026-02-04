@@ -376,13 +376,67 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/wa/groups/create", async (req: Request, res: Response) => {
-    const parsed = createGroupSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+  app.post("/api/wa/groups/create", upload.single("icon"), async (req: Request, res: Response) => {
+    const settings = await getWaSettings();
+    
+    if (!settings) {
+      return res.status(503).json({ error: "SETTINGS_NOT_CONFIGURED", message: "WhatsApp server settings not configured" });
     }
-    const { status, data } = await makeWaRequest("POST", "/api/groups/create", parsed.data);
-    res.status(status).json(data);
+    
+    const url = `${settings.baseUrl}/api/groups/create`;
+    
+    if (req.file) {
+      // Handle multipart form data with icon
+      const formData = new FormData();
+      formData.append("name", req.body.name);
+      
+      // Participants should be a JSON string array
+      const participants = req.body.participants;
+      if (typeof participants === "string") {
+        formData.append("participants", participants);
+      } else if (Array.isArray(participants)) {
+        formData.append("participants", JSON.stringify(participants));
+      }
+      
+      // Settings should be a JSON string object
+      if (req.body.settings) {
+        const settingsValue = typeof req.body.settings === "string" 
+          ? req.body.settings 
+          : JSON.stringify(req.body.settings);
+        formData.append("settings", settingsValue);
+      }
+      
+      // Append the icon file
+      formData.append("icon", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+      });
+      
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-API-Key": settings.apiKey,
+            ...formData.getHeaders(),
+          },
+          body: formData.getBuffer(),
+        });
+        
+        const data = await response.json().catch(() => ({}));
+        return res.status(response.status).json(data);
+      } catch (error) {
+        console.error("WhatsApp server request failed:", error);
+        return res.status(503).json({ error: "CONNECTION_FAILED", message: "Failed to connect to WhatsApp server" });
+      }
+    } else {
+      // Handle JSON request without icon
+      const parsed = createGroupSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+      }
+      const { status, data } = await makeWaRequest("POST", "/api/groups/create", parsed.data);
+      res.status(status).json(data);
+    }
   });
 
   app.post("/api/wa/diagnostics/check-number", async (req: Request, res: Response) => {
