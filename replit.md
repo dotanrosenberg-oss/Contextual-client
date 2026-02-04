@@ -76,6 +76,7 @@ Tagline: "Intelligent Unification"
 - `GET /api/wa/customers/:id/participants` - Get group participants (with optional `?includePhotos=true`)
 - `POST /api/wa/customers/:id/messages` - Send message (supports text and attachments)
 - `POST /api/wa/customers/sync` - Sync customers from WhatsApp
+- `PATCH /api/wa/customers/:id/settings` - Update group permission settings
 - `GET /api/wa/whatsapp/messages/:chatId` - Import historical messages from WhatsApp servers
 
 ### AI Insights
@@ -120,7 +121,7 @@ All components use Shadcn UI primitives with consistent styling:
 - Failed participants persistence - when group creation has failures, they are saved to the database and displayed in the participant list with strikethrough styling, reason, and ability to dismiss
 - Added Contacts page - browse all WhatsApp users extracted from groups and messages with search functionality
 - Contacts are automatically extracted from group participants and message senders during WhatsApp sync
-- Group permission settings panel - UI-only WhatsApp-style toggles for group admin settings
+- Group permission settings panel - WhatsApp-style toggles for group admin settings with ability to update existing groups
 - Added attachment support for sending media messages (images, videos, audio, documents)
 - MessageInput component with file picker, preview, and file type validation
 - MessageBubble component updated to display incoming media attachments

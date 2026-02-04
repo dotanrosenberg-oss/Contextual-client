@@ -22,7 +22,9 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { ServiceUnavailableState } from "./components/ServiceUnavailableState";
 import { WhatsAppNotLinkedState } from "./components/WhatsAppNotLinkedState";
 import { ParticipantList } from "./components/ParticipantList";
-import { MessageSquare, AlertCircle, Settings, Download, Loader2 } from "lucide-react";
+import { GroupSettingsPanel } from "./components/GroupSettingsPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MessageSquare, AlertCircle, Settings, Download, Loader2, Users } from "lucide-react";
 import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
 import type { Attachment } from "./components/MessageInput";
 import { useToast } from "@/hooks/use-toast";
@@ -301,11 +303,34 @@ function ChatView() {
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       
       <Sheet open={participantsOpen} onOpenChange={setParticipantsOpen}>
-        <SheetContent className="p-0 w-80 sm:w-96" data-testid="sheet-participants">
+        <SheetContent className="p-0 w-80 sm:w-96 flex flex-col" data-testid="sheet-participants">
           <SheetHeader className="sr-only">
-            <SheetTitle>Group Participants</SheetTitle>
+            <SheetTitle>Group Details</SheetTitle>
           </SheetHeader>
-          {selectedCustomerId && (
+          {selectedCustomerId && selectedCustomer?.participantCount && selectedCustomer.participantCount > 0 && (
+            <Tabs defaultValue="participants" className="flex flex-col h-full">
+              <TabsList className="grid w-full grid-cols-2 m-2 mb-0" data-testid="tabs-group-details">
+                <TabsTrigger value="participants" data-testid="tab-participants">
+                  <Users className="h-4 w-4 mr-2" />
+                  Members
+                </TabsTrigger>
+                <TabsTrigger value="settings" data-testid="tab-settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="participants" className="flex-1 mt-0 overflow-hidden">
+                <ParticipantList groupId={selectedCustomerId} includePhotos={true} />
+              </TabsContent>
+              <TabsContent value="settings" className="flex-1 mt-0 overflow-hidden">
+                <GroupSettingsPanel 
+                  groupId={selectedCustomerId} 
+                  disabled={serviceConnectionStatus !== "connected"}
+                />
+              </TabsContent>
+            </Tabs>
+          )}
+          {selectedCustomerId && (!selectedCustomer?.participantCount || selectedCustomer.participantCount === 0) && (
             <ParticipantList groupId={selectedCustomerId} includePhotos={true} />
           )}
         </SheetContent>
