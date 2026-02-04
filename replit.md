@@ -124,6 +124,7 @@ All components use Shadcn UI primitives with consistent styling:
 - Added attachment support for sending media messages (images, videos, audio, documents)
 - MessageInput component with file picker, preview, and file type validation
 - MessageBubble component updated to display incoming media attachments
+- Updated attachment sending to use multipart/form-data (matching WhatsApp server API)
 - Group settings now passed to WhatsApp server when creating groups (membersCanEditSettings, membersCanSendMessages, membersCanAddMembers)
 - Disabled "Admins approve new members" toggle (not supported by WhatsApp API)
 
