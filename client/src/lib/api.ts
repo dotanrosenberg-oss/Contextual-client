@@ -166,19 +166,6 @@ interface SendMessageVariables {
   attachment?: AttachmentData;
 }
 
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(",")[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export function useSendMessage() {
   const queryClient = useQueryClient();
   
@@ -186,27 +173,31 @@ export function useSendMessage() {
     mutationFn: async ({ customerId, message, attachment }: SendMessageVariables) => {
       if (!customerId) throw new Error("No customer selected");
       
-      let body: Record<string, unknown> = { message };
+      const url = `/api/wa/customers/${encodeURIComponent(customerId)}/messages`;
       
       if (attachment) {
-        const base64Data = await fileToBase64(attachment.file);
-        body = {
-          ...body,
-          attachment: {
-            data: base64Data,
-            mimetype: attachment.file.type,
-            filename: attachment.file.name,
-            type: attachment.type,
-          },
-        };
+        const formData = new FormData();
+        formData.append("file", attachment.file);
+        if (message.trim()) {
+          formData.append("caption", message);
+        }
+        
+        const res = await fetch(url, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`${res.status}: ${text || res.statusText}`);
+        }
+        
+        return res.json();
+      } else {
+        const res = await apiRequest("POST", url, { message });
+        return res.json();
       }
-      
-      const res = await apiRequest(
-        "POST",
-        `/api/wa/customers/${encodeURIComponent(customerId)}/messages`,
-        body
-      );
-      return res.json();
     },
     onSuccess: async (response, variables) => {
       if (response.message) {

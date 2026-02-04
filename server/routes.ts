@@ -5,26 +5,17 @@ import { IncomingMessage } from "http";
 import OpenAI from "openai";
 import { storage } from "./storage";
 import { z } from "zod";
+import multer from "multer";
+import FormData from "form-data";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const attachmentSchema = z.object({
-  data: z.string(),
-  mimetype: z.string(),
-  filename: z.string(),
-  type: z.enum(["image", "video", "audio", "document"]),
-});
-
 const sendMessageSchema = z.object({
-  message: z.string(),
-  attachment: attachmentSchema.optional(),
-}).refine(
-  (data) => data.message.trim().length > 0 || data.attachment !== undefined,
-  { message: "Either message or attachment is required" }
-);
+  message: z.string().min(1, "Message cannot be empty"),
+});
 
 const createGroupSchema = z.object({
   name: z.string().min(1, "Group name cannot be empty"),
@@ -43,6 +34,11 @@ const checkNumberSchema = z.object({
 
 const limitQuerySchema = z.coerce.number().int().min(1).max(500).default(100);
 const sinceQuerySchema = z.coerce.number().int().min(0).optional();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
+});
 
 async function getWaSettings() {
   const settings = await storage.getSettings();
@@ -327,25 +323,57 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
-  app.post("/api/wa/customers/:id/messages", async (req: Request, res: Response) => {
-    const parsed = sendMessageSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
-    }
+  app.post("/api/wa/customers/:id/messages", upload.single("file"), async (req: Request, res: Response) => {
     const { id } = req.params;
+    const settings = await getWaSettings();
     
-    const payload: Record<string, unknown> = {};
-    
-    if (parsed.data.message.trim()) {
-      payload.message = parsed.data.message;
+    if (!settings) {
+      return res.status(503).json({ error: "SETTINGS_NOT_CONFIGURED", message: "WhatsApp server settings not configured" });
     }
     
-    if (parsed.data.attachment) {
-      payload.attachment = parsed.data.attachment;
-    }
+    const url = `${settings.baseUrl}/api/customers/${encodeURIComponent(id)}/messages`;
     
-    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, payload);
-    res.status(status).json(data);
+    if (req.file) {
+      const formData = new FormData();
+      formData.append("file", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+      });
+      
+      if (req.body.caption) {
+        formData.append("caption", req.body.caption);
+      }
+      
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-API-Key": settings.apiKey,
+            ...formData.getHeaders(),
+          },
+          body: formData.getBuffer(),
+        });
+        
+        const data = await response.json().catch(() => ({}));
+        return res.status(response.status).json(data);
+      } catch (error) {
+        console.error("WhatsApp server request failed:", error);
+        return res.status(503).json({ error: "CONNECTION_FAILED", message: "Failed to connect to WhatsApp server" });
+      }
+    } else {
+      const parsed = sendMessageSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+      }
+      
+      const payload: Record<string, unknown> = {};
+      if (parsed.data.message.trim()) {
+        payload.message = parsed.data.message;
+      }
+      
+      const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, payload);
+      res.status(status).json(data);
+    }
   });
 
   app.post("/api/wa/groups/create", async (req: Request, res: Response) => {
