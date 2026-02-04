@@ -29,17 +29,57 @@ const ACCEPTED_TYPES = [
   "image/png",
   "image/gif",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "video/mp4",
+  "video/quicktime",
   "video/3gpp",
   "audio/mpeg",
   "audio/ogg",
   "audio/wav",
+  "audio/m4a",
+  "audio/x-m4a",
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
+
+const ACCEPTED_EXTENSIONS: Record<string, Attachment["type"]> = {
+  ".jpg": "image",
+  ".jpeg": "image",
+  ".png": "image",
+  ".gif": "image",
+  ".webp": "image",
+  ".heic": "image",
+  ".heif": "image",
+  ".mp4": "video",
+  ".mov": "video",
+  ".3gp": "video",
+  ".mp3": "audio",
+  ".ogg": "audio",
+  ".wav": "audio",
+  ".m4a": "audio",
+  ".pdf": "document",
+  ".doc": "document",
+  ".docx": "document",
+  ".xls": "document",
+  ".xlsx": "document",
+};
+
+function isAcceptedFile(file: File): { accepted: boolean; type?: Attachment["type"] } {
+  if (ACCEPTED_TYPES.includes(file.type)) {
+    return { accepted: true, type: getAttachmentType(file.type) };
+  }
+  
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
+  if (ext && ext in ACCEPTED_EXTENSIONS) {
+    return { accepted: true, type: ACCEPTED_EXTENSIONS[ext] };
+  }
+  
+  return { accepted: false };
+}
 
 const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
 
@@ -103,7 +143,8 @@ export function MessageInput({
     
     if (!file) return;
 
-    if (!ACCEPTED_TYPES.includes(file.type)) {
+    const fileCheck = isAcceptedFile(file);
+    if (!fileCheck.accepted || !fileCheck.type) {
       setFileError("File type not supported. Please use images, videos, audio, or documents.");
       return;
     }
@@ -113,7 +154,7 @@ export function MessageInput({
       return;
     }
 
-    const type = getAttachmentType(file.type);
+    const type = fileCheck.type;
     let preview: string | null = null;
 
     if (type === "image") {
@@ -191,7 +232,7 @@ export function MessageInput({
         <input
           ref={fileInputRef}
           type="file"
-          accept={ACCEPTED_TYPES.join(",")}
+          accept={[...ACCEPTED_TYPES, ...Object.keys(ACCEPTED_EXTENSIONS)].join(",")}
           onChange={handleFileSelect}
           className="hidden"
           data-testid="input-file-attachment"
