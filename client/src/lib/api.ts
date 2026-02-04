@@ -351,10 +351,18 @@ export function useGroupParticipants(groupId: string | null, includePhotos: bool
   });
 }
 
+interface GroupSettings {
+  membersCanEditSettings?: boolean;
+  membersCanSendMessages?: boolean;
+  membersCanAddMembers?: boolean;
+  adminsApproveNewMembers?: boolean;
+}
+
 interface CreateGroupPayload {
   name: string;
   participants: string[];
   image?: string;
+  settings?: GroupSettings;
 }
 
 interface CreateGroupResponse {
@@ -371,6 +379,12 @@ interface CreateGroupResponse {
     failedToAdd: number;
   };
   customer?: Customer;
+  appliedSettings?: {
+    membersCanEditSettings: boolean;
+    membersCanSendMessages: boolean;
+    membersCanAddMembers: boolean;
+    adminsApproveNewMembers: boolean;
+  };
 }
 
 interface CreateGroupErrorResponse {
