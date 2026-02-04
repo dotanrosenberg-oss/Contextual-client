@@ -24,22 +24,6 @@ function getAttachmentType(mimeType: string): Attachment["type"] {
   return "document";
 }
 
-const ACCEPTED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "video/mp4",
-  "video/3gpp",
-  "audio/mpeg",
-  "audio/ogg",
-  "audio/wav",
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-];
 
 const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
 
@@ -102,11 +86,6 @@ export function MessageInput({
     setFileError(null);
     
     if (!file) return;
-
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setFileError("File type not supported. Please use images, videos, audio, or documents.");
-      return;
-    }
 
     if (file.size > MAX_FILE_SIZE) {
       setFileError("File too large. Maximum size is 16MB.");
@@ -191,7 +170,6 @@ export function MessageInput({
         <input
           ref={fileInputRef}
           type="file"
-          accept={ACCEPTED_TYPES.join(",")}
           onChange={handleFileSelect}
           className="hidden"
           data-testid="input-file-attachment"

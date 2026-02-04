@@ -1,5 +1,15 @@
 import { cn } from "@/lib/utils";
-import { FileText, Play, Music } from "lucide-react";
+import { 
+  FileText, 
+  Play, 
+  Music, 
+  FileSpreadsheet, 
+  FileArchive, 
+  FileCode, 
+  FileImage,
+  File,
+  Download
+} from "lucide-react";
 
 interface MessageBubbleProps {
   id: string;
@@ -27,6 +37,39 @@ function getMediaTypeFromMimetype(mimetype: string | null | undefined): "image" 
   if (mimetype.startsWith("video/")) return "video";
   if (mimetype.startsWith("audio/")) return "audio";
   return "document";
+}
+
+function getFileIcon(mimetype: string | null | undefined, filename: string | null | undefined) {
+  const mime = mimetype?.toLowerCase() || "";
+  const name = filename?.toLowerCase() || "";
+  const ext = name.split(".").pop() || "";
+
+  if (mime.startsWith("image/")) return <FileImage className="h-5 w-5 flex-shrink-0" />;
+  if (mime.startsWith("video/")) return <Play className="h-5 w-5 flex-shrink-0" />;
+  if (mime.startsWith("audio/")) return <Music className="h-5 w-5 flex-shrink-0" />;
+  
+  if (mime.includes("spreadsheet") || mime.includes("excel") || 
+      ["csv", "xls", "xlsx", "numbers"].includes(ext)) {
+    return <FileSpreadsheet className="h-5 w-5 flex-shrink-0" />;
+  }
+  
+  if (mime.includes("zip") || mime.includes("compressed") || mime.includes("archive") ||
+      ["zip", "rar", "7z", "tar", "gz"].includes(ext)) {
+    return <FileArchive className="h-5 w-5 flex-shrink-0" />;
+  }
+  
+  if (mime.includes("javascript") || mime.includes("json") || mime.includes("xml") ||
+      mime.includes("html") || mime.includes("css") ||
+      ["js", "ts", "jsx", "tsx", "json", "xml", "html", "css", "py", "java", "cpp", "c", "h", "swift", "go", "rs", "rb", "php"].includes(ext)) {
+    return <FileCode className="h-5 w-5 flex-shrink-0" />;
+  }
+  
+  if (mime.includes("pdf") || mime.includes("document") || mime.includes("word") ||
+      ["pdf", "doc", "docx", "txt", "rtf", "odt"].includes(ext)) {
+    return <FileText className="h-5 w-5 flex-shrink-0" />;
+  }
+  
+  return <File className="h-5 w-5 flex-shrink-0" />;
 }
 
 function MediaContent({
@@ -90,20 +133,25 @@ function MediaContent({
         )}
         data-testid={`link-download-${filename || "file"}`}
       >
-        <FileText className="h-5 w-5 flex-shrink-0" />
+        {getFileIcon(mimetype, filename)}
         <span className="text-sm truncate max-w-[180px]">
           {filename || "Download file"}
         </span>
+        <Download className="h-4 w-4 flex-shrink-0 opacity-60" />
       </a>
     );
   }
 
   if (type === "image" || type === "video" || type === "audio" || type === "document") {
-    const icons = {
-      image: <FileText className="h-8 w-8" />,
-      video: <Play className="h-8 w-8" />,
-      audio: <Music className="h-8 w-8" />,
-      document: <FileText className="h-8 w-8" />,
+    const IconComponent = () => {
+      if (type === "image") return <FileImage className="h-8 w-8" />;
+      if (type === "video") return <Play className="h-8 w-8" />;
+      if (type === "audio") return <Music className="h-8 w-8" />;
+      return (
+        <span className="h-8 w-8 flex items-center justify-center">
+          {getFileIcon(mimetype, filename)}
+        </span>
+      );
     };
 
     return (
@@ -113,7 +161,7 @@ function MediaContent({
           isFromMe ? "bg-primary-foreground/10" : "bg-background"
         )}
       >
-        {icons[type as keyof typeof icons] || <FileText className="h-8 w-8" />}
+        <IconComponent />
         <div className="flex flex-col">
           <span className="text-sm font-medium capitalize">{type}</span>
           {filename && (
