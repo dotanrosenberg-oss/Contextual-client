@@ -48,14 +48,12 @@ interface GroupSettings {
   membersCanEditGroupSettings: boolean;
   membersCanSendMessages: boolean;
   membersCanAddOthers: boolean;
-  adminsApproveNewMembers: boolean;
 }
 
 const defaultGroupSettings: GroupSettings = {
   membersCanEditGroupSettings: true,
   membersCanSendMessages: true,
   membersCanAddOthers: true,
-  adminsApproveNewMembers: false,
 };
 
 export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) {
@@ -169,7 +167,6 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
           membersCanEditSettings: groupSettings.membersCanEditGroupSettings,
           membersCanSendMessages: groupSettings.membersCanSendMessages,
           membersCanAddMembers: groupSettings.membersCanAddOthers,
-          adminsApproveNewMembers: groupSettings.adminsApproveNewMembers,
         },
       });
       
@@ -513,24 +510,24 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-muted-foreground">Admins can</div>
                   
-                  <label 
-                    className="flex items-start gap-3 cursor-pointer"
+                  <div 
+                    className="flex items-start gap-3 opacity-50 cursor-not-allowed"
                     data-testid="setting-approve-members"
                   >
                     <ShieldCheck className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium">Approve new members</div>
                       <div className="text-xs text-muted-foreground">
-                        When turned on, admins must approve anyone who wants to join this group.
+                        This setting is not currently supported by the WhatsApp API.
                       </div>
                     </div>
                     <Checkbox 
-                      checked={groupSettings.adminsApproveNewMembers}
-                      onCheckedChange={(checked) => setGroupSettings(s => ({ ...s, adminsApproveNewMembers: checked === true }))}
-                      className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                      checked={false}
+                      disabled
+                      className="shrink-0"
                       data-testid="checkbox-approve-members"
                     />
-                  </label>
+                  </div>
                 </div>
               </>
             )}

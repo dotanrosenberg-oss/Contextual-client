@@ -34,7 +34,6 @@ const createGroupSchema = z.object({
     membersCanEditSettings: z.boolean().optional(),
     membersCanSendMessages: z.boolean().optional(),
     membersCanAddMembers: z.boolean().optional(),
-    adminsApproveNewMembers: z.boolean().optional(),
   }).optional(),
 });
 

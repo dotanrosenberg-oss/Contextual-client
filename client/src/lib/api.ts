@@ -355,7 +355,6 @@ interface GroupSettings {
   membersCanEditSettings?: boolean;
   membersCanSendMessages?: boolean;
   membersCanAddMembers?: boolean;
-  adminsApproveNewMembers?: boolean;
 }
 
 interface CreateGroupPayload {
@@ -383,7 +382,6 @@ interface CreateGroupResponse {
     membersCanEditSettings: boolean;
     membersCanSendMessages: boolean;
     membersCanAddMembers: boolean;
-    adminsApproveNewMembers: boolean;
   };
 }
 
