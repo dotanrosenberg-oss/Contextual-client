@@ -50,6 +50,7 @@ Tagline: "Intelligent Unification"
 - **Tri-pane Layout**: Sidebar (chat list) | Center (messages) | Right (copilot)
 - **Real-time Updates**: WebSocket connection for live message updates
 - **Dark/Light Mode**: Full theme support with toggle
+- **Attachment Support**: Send images, videos, audio files, and documents (up to 16MB)
 
 ### Copilot Panel Widgets
 - **Conversation Summary**: AI-generated summary of recent messages
@@ -73,7 +74,7 @@ Tagline: "Intelligent Unification"
 - `GET /api/wa/customers/:id` - Get customer
 - `GET /api/wa/customers/:id/messages` - Get messages (local database)
 - `GET /api/wa/customers/:id/participants` - Get group participants (with optional `?includePhotos=true`)
-- `POST /api/wa/customers/:id/messages` - Send message
+- `POST /api/wa/customers/:id/messages` - Send message (supports text and attachments)
 - `POST /api/wa/customers/sync` - Sync customers from WhatsApp
 - `GET /api/wa/whatsapp/messages/:chatId` - Import historical messages from WhatsApp servers
 
@@ -120,6 +121,9 @@ All components use Shadcn UI primitives with consistent styling:
 - Added Contacts page - browse all WhatsApp users extracted from groups and messages with search functionality
 - Contacts are automatically extracted from group participants and message senders during WhatsApp sync
 - Group permission settings panel - UI-only WhatsApp-style toggles for group admin settings
+- Added attachment support for sending media messages (images, videos, audio, documents)
+- MessageInput component with file picker, preview, and file type validation
+- MessageBubble component updated to display incoming media attachments
 
 ## User Preferences
 - Professional, clean interface
