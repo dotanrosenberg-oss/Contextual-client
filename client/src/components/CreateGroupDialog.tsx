@@ -165,6 +165,12 @@ export function CreateGroupDialog({ disabled = false }: CreateGroupDialogProps) 
         name: values.name,
         participants,
         image: imageBase64 || undefined,
+        settings: {
+          membersCanEditSettings: groupSettings.membersCanEditGroupSettings,
+          membersCanSendMessages: groupSettings.membersCanSendMessages,
+          membersCanAddMembers: groupSettings.membersCanAddOthers,
+          adminsApproveNewMembers: groupSettings.adminsApproveNewMembers,
+        },
       });
       
       const successCount = result.summary?.successfullyAdded || 0;
