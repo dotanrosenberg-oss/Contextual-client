@@ -173,9 +173,15 @@ interface SendPollVariables {
   allowMultipleAnswers?: boolean;
 }
 
+interface PollMessage extends Message {
+  pollQuestion?: string | null;
+  pollOptions?: string[] | null;
+  allowMultipleAnswers?: boolean;
+}
+
 interface SendPollResponse {
   success: boolean;
-  message?: Message;
+  message?: PollMessage;
 }
 
 export function useSendPoll() {
@@ -191,21 +197,23 @@ export function useSendPoll() {
     },
     onSuccess: async (response, variables) => {
       if (response.message) {
-        await cacheMessages([response.message]);
+        const pollMsg = response.message;
         
-        const msgTimestamp = new Date(response.message.timestamp).getTime();
+        await cacheMessages([pollMsg]).catch(() => {});
+        
+        const msgTimestamp = new Date(pollMsg.timestamp).getTime();
         await updateSyncMeta({
           key: `messages-${variables.customerId}`,
           lastSyncTimestamp: msgTimestamp,
         }).catch(() => {});
         
-        queryClient.setQueryData<Message[]>(
+        queryClient.setQueryData(
           ["/api/wa/customers", variables.customerId, "messages"],
-          (old) => {
-            if (!old) return [response.message!];
-            const exists = old.some((m) => m.id === response.message!.id);
-            if (exists) return old;
-            const updated = [...old, response.message!];
+          (old: unknown) => {
+            const oldMessages = (old as PollMessage[] | undefined) || [];
+            const exists = oldMessages.some((m) => m.id === pollMsg.id);
+            if (exists) return oldMessages;
+            const updated = [...oldMessages, pollMsg];
             updated.sort((a, b) => 
               new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
             );
