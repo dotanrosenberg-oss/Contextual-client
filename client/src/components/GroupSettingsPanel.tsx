@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useGroupSettings, useUpdateGroupSettings } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -15,86 +15,82 @@ interface GroupSettings {
   membersCanAddMembers: boolean;
 }
 
-const defaultGroupSettings: GroupSettings = {
-  membersCanEditSettings: true,
-  membersCanSendMessages: true,
-  membersCanAddMembers: true,
-};
-
 interface GroupSettingsPanelProps {
   groupId: string;
   disabled?: boolean;
 }
 
 export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsPanelProps) {
-  const [settings, setSettings] = useState<GroupSettings>(defaultGroupSettings);
-  const initialSettingsRef = useRef<GroupSettings>(defaultGroupSettings);
+  const [localChanges, setLocalChanges] = useState<Partial<GroupSettings>>({});
+  const prevGroupIdRef = useRef<string>(groupId);
   const { data: fetchedSettings, isLoading, error } = useGroupSettings(groupId);
   const updateSettingsMutation = useUpdateGroupSettings();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (fetchedSettings) {
-      const newSettings: GroupSettings = {
-        membersCanEditSettings: fetchedSettings.membersCanEditSettings,
-        membersCanSendMessages: fetchedSettings.membersCanSendMessages,
-        membersCanAddMembers: fetchedSettings.membersCanAddMembers,
-      };
-      initialSettingsRef.current = newSettings;
-      setSettings(newSettings);
+    if (groupId !== prevGroupIdRef.current) {
+      setLocalChanges({});
+      prevGroupIdRef.current = groupId;
     }
-  }, [fetchedSettings]);
-
-  useEffect(() => {
-    initialSettingsRef.current = defaultGroupSettings;
-    setSettings(defaultGroupSettings);
   }, [groupId]);
 
+  const serverSettings: GroupSettings | null = fetchedSettings ? {
+    membersCanEditSettings: fetchedSettings.membersCanEditSettings,
+    membersCanSendMessages: fetchedSettings.membersCanSendMessages,
+    membersCanAddMembers: fetchedSettings.membersCanAddMembers,
+  } : null;
+
+  const displaySettings: GroupSettings | null = useMemo(() => {
+    if (!serverSettings) {
+      return null;
+    }
+    return {
+      membersCanEditSettings: localChanges.membersCanEditSettings ?? serverSettings.membersCanEditSettings,
+      membersCanSendMessages: localChanges.membersCanSendMessages ?? serverSettings.membersCanSendMessages,
+      membersCanAddMembers: localChanges.membersCanAddMembers ?? serverSettings.membersCanAddMembers,
+    };
+  }, [serverSettings, localChanges]);
+
   const hasChanges = useMemo(() => {
+    if (!serverSettings) return false;
     return (
-      settings.membersCanEditSettings !== initialSettingsRef.current.membersCanEditSettings ||
-      settings.membersCanSendMessages !== initialSettingsRef.current.membersCanSendMessages ||
-      settings.membersCanAddMembers !== initialSettingsRef.current.membersCanAddMembers
+      (localChanges.membersCanEditSettings !== undefined && localChanges.membersCanEditSettings !== serverSettings.membersCanEditSettings) ||
+      (localChanges.membersCanSendMessages !== undefined && localChanges.membersCanSendMessages !== serverSettings.membersCanSendMessages) ||
+      (localChanges.membersCanAddMembers !== undefined && localChanges.membersCanAddMembers !== serverSettings.membersCanAddMembers)
     );
-  }, [settings]);
+  }, [serverSettings, localChanges]);
 
   const handleSettingChange = (key: keyof GroupSettings, value: boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    setLocalChanges(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSaveSettings = async () => {
     try {
-      const result = await updateSettingsMutation.mutateAsync({
+      await updateSettingsMutation.mutateAsync({
         customerId: groupId,
         settings: {
-          membersCanEditSettings: settings.membersCanEditSettings,
-          membersCanSendMessages: settings.membersCanSendMessages,
-          membersCanAddMembers: settings.membersCanAddMembers,
+          membersCanEditSettings: displaySettings.membersCanEditSettings,
+          membersCanSendMessages: displaySettings.membersCanSendMessages,
+          membersCanAddMembers: displaySettings.membersCanAddMembers,
         },
       });
       
-      const updatedSettings: GroupSettings = {
-        membersCanEditSettings: result.membersCanEditSettings,
-        membersCanSendMessages: result.membersCanSendMessages,
-        membersCanAddMembers: result.membersCanAddMembers,
-      };
-      initialSettingsRef.current = updatedSettings;
-      setSettings(updatedSettings);
+      setLocalChanges({});
       
       toast({
         title: "Settings updated",
         description: "Group settings have been saved successfully.",
       });
-    } catch (error) {
+    } catch (err) {
       toast({
         title: "Failed to update settings",
-        description: (error as Error).message,
+        description: err instanceof Error ? err.message : "An error occurred",
         variant: "destructive",
       });
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !displaySettings) {
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-2 p-4 border-b">
@@ -155,7 +151,7 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
                 </div>
               </div>
               <Checkbox 
-                checked={settings.membersCanEditSettings}
+                checked={displaySettings.membersCanEditSettings}
                 onCheckedChange={(checked) => handleSettingChange('membersCanEditSettings', checked === true)}
                 disabled={disabled}
                 className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
@@ -172,7 +168,7 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
                 <div className="text-sm font-medium">Send new messages</div>
               </div>
               <Checkbox 
-                checked={settings.membersCanSendMessages}
+                checked={displaySettings.membersCanSendMessages}
                 onCheckedChange={(checked) => handleSettingChange('membersCanSendMessages', checked === true)}
                 disabled={disabled}
                 className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
@@ -189,7 +185,7 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
                 <div className="text-sm font-medium">Add other members</div>
               </div>
               <Checkbox 
-                checked={settings.membersCanAddMembers}
+                checked={displaySettings.membersCanAddMembers}
                 onCheckedChange={(checked) => handleSettingChange('membersCanAddMembers', checked === true)}
                 disabled={disabled}
                 className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
