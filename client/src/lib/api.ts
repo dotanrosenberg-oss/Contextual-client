@@ -708,3 +708,33 @@ export function useUpdateGroupSettings() {
     },
   });
 }
+
+interface RequestJoinUrlPayload {
+  groupId: string;
+  phoneNumber: string;
+  failedParticipantId: number;
+}
+
+interface RequestJoinUrlResponse {
+  success: boolean;
+  url: string;
+  failedParticipant: FailedParticipant;
+}
+
+export function useRequestJoinUrl() {
+  const qc = useQueryClient();
+  
+  return useMutation<RequestJoinUrlResponse, Error, RequestJoinUrlPayload>({
+    mutationFn: async (payload) => {
+      const res = await apiRequest("POST", "/api/groups/join-url", payload);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || "Failed to get join URL");
+      }
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: [`/api/customers/${variables.groupId}/failed-participants`] });
+    },
+  });
+}

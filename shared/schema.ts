@@ -123,6 +123,8 @@ export const failedParticipants = pgTable("failed_participants", {
   customerId: varchar("customer_id").notNull(),
   phoneNumber: text("phone_number").notNull(),
   reason: text("reason").notNull(),
+  joinUrl: text("join_url"),
+  joinUrlRequestedAt: timestamp("join_url_requested_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
