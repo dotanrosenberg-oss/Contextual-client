@@ -166,6 +166,61 @@ interface SendMessageVariables {
   attachment?: AttachmentData;
 }
 
+interface SendPollVariables {
+  customerId: string;
+  question: string;
+  options: string[];
+  allowMultipleAnswers?: boolean;
+}
+
+interface SendPollResponse {
+  success: boolean;
+  message?: Message;
+}
+
+export function useSendPoll() {
+  const queryClient = useQueryClient();
+  
+  return useMutation<SendPollResponse, Error, SendPollVariables>({
+    mutationFn: async ({ customerId, question, options, allowMultipleAnswers = false }) => {
+      if (!customerId) throw new Error("No customer selected");
+      
+      const url = `/api/wa/customers/${encodeURIComponent(customerId)}/poll`;
+      const res = await apiRequest("POST", url, { question, options, allowMultipleAnswers });
+      return res.json();
+    },
+    onSuccess: async (response, variables) => {
+      if (response.message) {
+        await cacheMessages([response.message]);
+        
+        const msgTimestamp = new Date(response.message.timestamp).getTime();
+        await updateSyncMeta({
+          key: `messages-${variables.customerId}`,
+          lastSyncTimestamp: msgTimestamp,
+        }).catch(() => {});
+        
+        queryClient.setQueryData<Message[]>(
+          ["/api/wa/customers", variables.customerId, "messages"],
+          (old) => {
+            if (!old) return [response.message!];
+            const exists = old.some((m) => m.id === response.message!.id);
+            if (exists) return old;
+            const updated = [...old, response.message!];
+            updated.sort((a, b) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+            return updated;
+          }
+        );
+      }
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/wa/customers"],
+      });
+    },
+  });
+}
+
 export function useSendMessage() {
   const queryClient = useQueryClient();
   

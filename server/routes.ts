@@ -19,6 +19,12 @@ const sendMessageSchema = z.object({
   message: z.string().min(1, "Message cannot be empty"),
 });
 
+const sendPollSchema = z.object({
+  question: z.string().min(1, "Poll question is required").max(255),
+  options: z.array(z.string().max(100)).min(2).max(12),
+  allowMultipleAnswers: z.boolean().optional().default(false),
+});
+
 const createGroupSchema = z.object({
   name: z.string().min(1, "Group name cannot be empty"),
   participants: z.array(z.string()).min(1, "At least one participant required"),
@@ -392,6 +398,19 @@ export async function registerRoutes(
       const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/messages`, payload);
       res.status(status).json(data);
     }
+  });
+
+  // Send poll to a customer (WhatsApp group)
+  app.post("/api/wa/customers/:id/poll", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const parsed = sendPollSchema.safeParse(req.body);
+    
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
+    }
+    
+    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/poll`, parsed.data);
+    res.status(status).json(data);
   });
 
   app.post("/api/wa/groups/create", upload.single("icon"), async (req: Request, res: Response) => {

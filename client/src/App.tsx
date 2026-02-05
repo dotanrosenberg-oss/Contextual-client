@@ -25,7 +25,8 @@ import { ParticipantList } from "./components/ParticipantList";
 import { GroupSettingsPanel } from "./components/GroupSettingsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, AlertCircle, Settings, Download, Loader2, Users } from "lucide-react";
-import { useCustomers, useMessages, useSendMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
+import { useCustomers, useMessages, useSendMessage, useSendPoll, useServerStatus, useSettings, useImportHistory } from "./lib/api";
+import { PollComposer } from "./components/PollComposer";
 import type { Attachment } from "./components/MessageInput";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "./hooks/useWebSocket";
@@ -36,6 +37,7 @@ function ChatView() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [showPollComposer, setShowPollComposer] = useState(false);
   const queryClientInstance = useQueryClient();
   const { toast } = useToast();
 
@@ -45,6 +47,7 @@ function ChatView() {
   const { data: settings, isLoading: settingsLoading } = useSettings();
   
   const sendMessageMutation = useSendMessage();
+  const sendPollMutation = useSendPoll();
   const importHistoryMutation = useImportHistory();
 
   const isServiceConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
@@ -119,6 +122,31 @@ function ChatView() {
     } catch (error) {
       toast({
         title: "Import failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendPoll = async (question: string, options: string[], allowMultipleAnswers: boolean) => {
+    if (!selectedCustomerId) return;
+    
+    try {
+      await sendPollMutation.mutateAsync({
+        customerId: selectedCustomerId,
+        question,
+        options,
+        allowMultipleAnswers,
+      });
+      setShowPollComposer(false);
+      toast({
+        title: "Poll sent",
+        description: "Your poll has been sent to the group",
+      });
+    } catch (error) {
+      console.error("Failed to send poll:", error);
+      toast({
+        title: "Failed to send poll",
         description: (error as Error).message,
         variant: "destructive",
       });
@@ -259,18 +287,23 @@ function ChatView() {
                         </div>
                       )
                     ) : (
-                      messages.map((message) => (
-                        <MessageBubble
-                          key={message.id}
-                          id={message.id}
-                          body={message.body}
-                          timestamp={message.timestamp}
-                          isFromMe={message.isFromMe ?? false}
-                          senderName={message.fromName}
-                          hasMedia={message.hasMedia ?? false}
-                          messageType={message.messageType}
-                        />
-                      ))
+                      messages.map((message) => {
+                        const msg = message as typeof message & { pollQuestion?: string | null; pollOptions?: string[] | null };
+                        return (
+                          <MessageBubble
+                            key={msg.id}
+                            id={msg.id}
+                            body={msg.body}
+                            timestamp={msg.timestamp}
+                            isFromMe={msg.isFromMe ?? false}
+                            senderName={msg.fromName}
+                            hasMedia={msg.hasMedia ?? false}
+                            messageType={msg.messageType}
+                            pollQuestion={msg.pollQuestion}
+                            pollOptions={msg.pollOptions}
+                          />
+                        );
+                      })
                     )}
                   </div>
                 </ScrollArea>
@@ -286,11 +319,26 @@ function ChatView() {
           </div>
           
           {selectedCustomer && (
-            <MessageInput
-              onSend={handleSendMessage}
-              isLoading={sendMessageMutation.isPending}
-              disabled={!selectedCustomer || serviceConnectionStatus !== "connected"}
-            />
+            <div className="flex flex-col">
+              {showPollComposer && (
+                <div className="p-3 border-t">
+                  <PollComposer
+                    onSend={handleSendPoll}
+                    onCancel={() => setShowPollComposer(false)}
+                    isLoading={sendPollMutation.isPending}
+                    disabled={serviceConnectionStatus !== "connected"}
+                  />
+                </div>
+              )}
+              {!showPollComposer && (
+                <MessageInput
+                  onSend={handleSendMessage}
+                  onPollClick={() => setShowPollComposer(true)}
+                  isLoading={sendMessageMutation.isPending}
+                  disabled={!selectedCustomer || serviceConnectionStatus !== "connected"}
+                />
+              )}
+            </div>
           )}
         </div>
         

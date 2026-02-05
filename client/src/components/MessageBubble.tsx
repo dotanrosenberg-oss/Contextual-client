@@ -8,7 +8,9 @@ import {
   FileCode, 
   FileImage,
   File,
-  Download
+  Download,
+  BarChart3,
+  Circle
 } from "lucide-react";
 
 interface MessageBubbleProps {
@@ -22,6 +24,8 @@ interface MessageBubbleProps {
   mediaUrl?: string | null;
   mimetype?: string | null;
   filename?: string | null;
+  pollQuestion?: string | null;
+  pollOptions?: string[] | null;
 }
 
 function formatMessageTime(date: Date): string {
@@ -177,6 +181,47 @@ function MediaContent({
   return null;
 }
 
+function PollContent({
+  question,
+  options,
+  isFromMe,
+}: {
+  question: string;
+  options: string[];
+  isFromMe: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-md p-3",
+        isFromMe ? "bg-primary-foreground/10" : "bg-background"
+      )}
+      data-testid="poll-content"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <BarChart3 className="h-4 w-4 flex-shrink-0" />
+        <span className="text-xs font-medium uppercase tracking-wide opacity-70">Poll</span>
+      </div>
+      <p className="font-medium text-sm mb-3">{question}</p>
+      <div className="space-y-2">
+        {options.map((option, index) => (
+          <div
+            key={index}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-md text-sm",
+              isFromMe ? "bg-primary-foreground/5" : "bg-muted"
+            )}
+            data-testid={`poll-option-${index}`}
+          >
+            <Circle className="h-3 w-3 flex-shrink-0 opacity-50" />
+            <span>{option}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function MessageBubble({
   id,
   body,
@@ -188,8 +233,11 @@ export function MessageBubble({
   mediaUrl,
   mimetype,
   filename,
+  pollQuestion,
+  pollOptions,
 }: MessageBubbleProps) {
-  const showMedia = hasMedia || (messageType && messageType !== "text" && messageType !== "chat");
+  const showMedia = hasMedia || (messageType && messageType !== "text" && messageType !== "chat" && messageType !== "poll");
+  const isPoll = messageType === "poll" && pollQuestion && pollOptions && pollOptions.length > 0;
 
   return (
     <div
@@ -211,6 +259,16 @@ export function MessageBubble({
           <p className="text-xs font-medium text-primary mb-1">{senderName}</p>
         )}
         
+        {isPoll && (
+          <div className="mb-2">
+            <PollContent
+              question={pollQuestion}
+              options={pollOptions}
+              isFromMe={isFromMe}
+            />
+          </div>
+        )}
+        
         {showMedia && (
           <div className="mb-2">
             <MediaContent
@@ -223,7 +281,7 @@ export function MessageBubble({
           </div>
         )}
         
-        {body && (
+        {body && !isPoll && (
           <p className="text-sm whitespace-pre-wrap break-words">{body}</p>
         )}
         

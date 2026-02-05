@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent, ChangeEvent } from "react";
-import { Send, Loader2, Paperclip, X, File, Image as ImageIcon } from "lucide-react";
+import { Send, Loader2, Paperclip, X, File, Image as ImageIcon, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface Attachment {
   file: File;
@@ -12,6 +13,7 @@ export interface Attachment {
 
 interface MessageInputProps {
   onSend: (message: string, attachment?: Attachment) => void;
+  onPollClick?: () => void;
   isLoading?: boolean;
   placeholder?: string;
   disabled?: boolean;
@@ -29,6 +31,7 @@ const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
 
 export function MessageInput({
   onSend,
+  onPollClick,
   isLoading = false,
   placeholder = "Type a message...",
   disabled = false,
@@ -174,16 +177,38 @@ export function MessageInput({
           className="hidden"
           data-testid="input-file-attachment"
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleAttachClick}
-          disabled={disabled || isLoading}
-          data-testid="button-attach-file"
-        >
-          <Paperclip className="h-5 w-5" />
-          <span className="sr-only">Attach file</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleAttachClick}
+              disabled={disabled || isLoading}
+              data-testid="button-attach-file"
+            >
+              <Paperclip className="h-5 w-5" />
+              <span className="sr-only">Attach file</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Attach file</TooltipContent>
+        </Tooltip>
+        {onPollClick && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onPollClick}
+                disabled={disabled || isLoading}
+                data-testid="button-create-poll"
+              >
+                <BarChart3 className="h-5 w-5" />
+                <span className="sr-only">Create poll</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create poll</TooltipContent>
+          </Tooltip>
+        )}
         <Textarea
           ref={textareaRef}
           value={message}
