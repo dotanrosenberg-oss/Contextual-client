@@ -564,6 +564,22 @@ export function useDeleteFailedParticipant() {
   });
 }
 
+interface GroupSettingsResponse {
+  membersCanEditSettings: boolean;
+  membersCanSendMessages: boolean;
+  membersCanAddMembers: boolean;
+  lastUpdated?: string;
+  source?: string;
+}
+
+export function useGroupSettings(groupId: string | null) {
+  return useQuery<GroupSettingsResponse>({
+    queryKey: [`/api/wa/customers/${groupId}/settings`],
+    enabled: !!groupId,
+    staleTime: 60000,
+  });
+}
+
 interface UpdateGroupSettingsPayload {
   customerId: string;
   settings: GroupSettings;
@@ -573,9 +589,13 @@ interface UpdateGroupSettingsResponse {
   membersCanEditSettings: boolean;
   membersCanSendMessages: boolean;
   membersCanAddMembers: boolean;
+  lastUpdated?: string;
+  source?: string;
 }
 
 export function useUpdateGroupSettings() {
+  const qc = useQueryClient();
+  
   return useMutation<UpdateGroupSettingsResponse, Error, UpdateGroupSettingsPayload>({
     mutationFn: async ({ customerId, settings }) => {
       const res = await fetch(`/api/wa/customers/${encodeURIComponent(customerId)}/settings`, {
@@ -591,6 +611,9 @@ export function useUpdateGroupSettings() {
       }
       
       return res.json();
+    },
+    onSuccess: (data, variables) => {
+      qc.setQueryData([`/api/wa/customers/${variables.customerId}/settings`], data);
     },
   });
 }

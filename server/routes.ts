@@ -546,6 +546,14 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
+  // Get group settings
+  app.get("/api/wa/customers/:id/settings", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const path = `/api/customers/${encodeURIComponent(id)}/settings`;
+    const { status, data } = await makeWaRequest("GET", path);
+    res.status(status).json(data);
+  });
+
   // Update group settings
   const groupSettingsSchema = z.object({
     membersCanEditSettings: z.boolean().optional(),

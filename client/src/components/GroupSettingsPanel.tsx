@@ -1,23 +1,24 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useUpdateGroupSettings } from "@/lib/api";
+import { useGroupSettings, useUpdateGroupSettings } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Pencil, MessageSquare, UserPlus, ShieldCheck, Settings, Info } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2, Pencil, MessageSquare, UserPlus, ShieldCheck, Settings, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface GroupSettings {
-  membersCanEditGroupSettings: boolean;
+  membersCanEditSettings: boolean;
   membersCanSendMessages: boolean;
-  membersCanAddOthers: boolean;
+  membersCanAddMembers: boolean;
 }
 
 const defaultGroupSettings: GroupSettings = {
-  membersCanEditGroupSettings: true,
+  membersCanEditSettings: true,
   membersCanSendMessages: true,
-  membersCanAddOthers: true,
+  membersCanAddMembers: true,
 };
 
 interface GroupSettingsPanelProps {
@@ -28,8 +29,21 @@ interface GroupSettingsPanelProps {
 export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsPanelProps) {
   const [settings, setSettings] = useState<GroupSettings>(defaultGroupSettings);
   const initialSettingsRef = useRef<GroupSettings>(defaultGroupSettings);
+  const { data: fetchedSettings, isLoading, error } = useGroupSettings(groupId);
   const updateSettingsMutation = useUpdateGroupSettings();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (fetchedSettings) {
+      const newSettings: GroupSettings = {
+        membersCanEditSettings: fetchedSettings.membersCanEditSettings,
+        membersCanSendMessages: fetchedSettings.membersCanSendMessages,
+        membersCanAddMembers: fetchedSettings.membersCanAddMembers,
+      };
+      initialSettingsRef.current = newSettings;
+      setSettings(newSettings);
+    }
+  }, [fetchedSettings]);
 
   useEffect(() => {
     initialSettingsRef.current = defaultGroupSettings;
@@ -38,9 +52,9 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
 
   const hasChanges = useMemo(() => {
     return (
-      settings.membersCanEditGroupSettings !== initialSettingsRef.current.membersCanEditGroupSettings ||
+      settings.membersCanEditSettings !== initialSettingsRef.current.membersCanEditSettings ||
       settings.membersCanSendMessages !== initialSettingsRef.current.membersCanSendMessages ||
-      settings.membersCanAddOthers !== initialSettingsRef.current.membersCanAddOthers
+      settings.membersCanAddMembers !== initialSettingsRef.current.membersCanAddMembers
     );
   }, [settings]);
 
@@ -50,16 +64,22 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
 
   const handleSaveSettings = async () => {
     try {
-      await updateSettingsMutation.mutateAsync({
+      const result = await updateSettingsMutation.mutateAsync({
         customerId: groupId,
         settings: {
-          membersCanEditSettings: settings.membersCanEditGroupSettings,
+          membersCanEditSettings: settings.membersCanEditSettings,
           membersCanSendMessages: settings.membersCanSendMessages,
-          membersCanAddMembers: settings.membersCanAddOthers,
+          membersCanAddMembers: settings.membersCanAddMembers,
         },
       });
       
-      initialSettingsRef.current = { ...settings };
+      const updatedSettings: GroupSettings = {
+        membersCanEditSettings: result.membersCanEditSettings,
+        membersCanSendMessages: result.membersCanSendMessages,
+        membersCanAddMembers: result.membersCanAddMembers,
+      };
+      initialSettingsRef.current = updatedSettings;
+      setSettings(updatedSettings);
       
       toast({
         title: "Settings updated",
@@ -74,6 +94,43 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 p-4 border-b">
+          <Settings className="h-5 w-5 text-muted-foreground" />
+          <span className="font-medium">Group Settings</span>
+        </div>
+        <div className="p-4 space-y-4">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to load group settings";
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 p-4 border-b">
+          <Settings className="h-5 w-5 text-muted-foreground" />
+          <span className="font-medium">Group Settings</span>
+        </div>
+        <div className="p-4">
+          <Alert variant="destructive" data-testid="alert-settings-error">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              {errorMessage}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 p-4 border-b">
@@ -83,13 +140,6 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
       
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          <Alert className="bg-muted/50" data-testid="alert-settings-info">
-            <Info className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              Current group settings cannot be retrieved from WhatsApp. Toggle the options below and save to update the settings.
-            </AlertDescription>
-          </Alert>
-
           <div className="space-y-3">
             <div className="text-sm font-medium text-muted-foreground">Members can</div>
             
@@ -105,8 +155,8 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
                 </div>
               </div>
               <Checkbox 
-                checked={settings.membersCanEditGroupSettings}
-                onCheckedChange={(checked) => handleSettingChange('membersCanEditGroupSettings', checked === true)}
+                checked={settings.membersCanEditSettings}
+                onCheckedChange={(checked) => handleSettingChange('membersCanEditSettings', checked === true)}
                 disabled={disabled}
                 className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                 data-testid="checkbox-edit-group-existing"
@@ -139,8 +189,8 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
                 <div className="text-sm font-medium">Add other members</div>
               </div>
               <Checkbox 
-                checked={settings.membersCanAddOthers}
-                onCheckedChange={(checked) => handleSettingChange('membersCanAddOthers', checked === true)}
+                checked={settings.membersCanAddMembers}
+                onCheckedChange={(checked) => handleSettingChange('membersCanAddMembers', checked === true)}
                 disabled={disabled}
                 className="shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                 data-testid="checkbox-add-members-existing"
