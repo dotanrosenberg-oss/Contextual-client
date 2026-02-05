@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,13 @@ function ChatView() {
   const [showPollComposer, setShowPollComposer] = useState(false);
   const queryClientInstance = useQueryClient();
   const { toast } = useToast();
+  const { setOpen } = useSidebar();
+
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setOpen(true);
+    }
+  }, [selectedCustomerId, setOpen]);
 
   const { data: customers = [], isLoading: customersLoading, error: customersError } = useCustomers();
   const { data: messages = [], isLoading: messagesLoading, error: messagesError } = useMessages(selectedCustomerId);
@@ -308,14 +315,7 @@ function ChatView() {
                   </div>
                 </ScrollArea>
               )
-            ) : (
-              <EmptyState
-                icon={MessageSquare}
-                title="No chat selected"
-                description="Select a conversation from the sidebar to start messaging"
-                className="h-full"
-              />
-            )}
+            ) : null}
           </div>
           
           {selectedCustomer && (
