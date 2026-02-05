@@ -613,8 +613,21 @@ export function useUpdateGroupSettings() {
       
       return res.json();
     },
-    onSuccess: (data, variables) => {
-      qc.setQueryData([`/api/wa/customers/${variables.customerId}/settings`], data);
+    onSuccess: (_data, variables) => {
+      const queryKey = [`/api/wa/customers/${variables.customerId}/settings`];
+      
+      qc.setQueryData<GroupSettingsResponse>(queryKey, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          ...variables.settings,
+          lastUpdated: new Date().toISOString(),
+        };
+      });
+      
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey });
+      }, 3000);
     },
   });
 }
