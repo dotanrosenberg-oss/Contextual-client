@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Pencil, MessageSquare, UserPlus, ShieldCheck, Settings, AlertCircle } from "lucide-react";
+import { Loader2, Pencil, MessageSquare, UserPlus, ShieldCheck, Settings, AlertCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface GroupSettings {
@@ -23,7 +23,7 @@ interface GroupSettingsPanelProps {
 export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsPanelProps) {
   const [localChanges, setLocalChanges] = useState<Partial<GroupSettings>>({});
   const prevGroupIdRef = useRef<string>(groupId);
-  const { data: fetchedSettings, isLoading, error } = useGroupSettings(groupId);
+  const { data: fetchedSettings, isLoading, error, refetch, isFetching } = useGroupSettings(groupId);
   const updateSettingsMutation = useUpdateGroupSettings();
   const { toast } = useToast();
 
@@ -65,6 +65,8 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
   };
 
   const handleSaveSettings = async () => {
+    if (!displaySettings) return;
+    
     try {
       await updateSettingsMutation.mutateAsync({
         customerId: groupId,
@@ -127,11 +129,26 @@ export function GroupSettingsPanel({ groupId, disabled = false }: GroupSettingsP
     );
   }
 
+  const handleRefresh = () => {
+    setLocalChanges({});
+    refetch();
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 p-4 border-b">
         <Settings className="h-5 w-5 text-muted-foreground" />
-        <span className="font-medium">Group Settings</span>
+        <span className="font-medium flex-1">Group Settings</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          title="Refresh settings from server"
+          data-testid="button-refresh-settings"
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
       
       <ScrollArea className="flex-1">
