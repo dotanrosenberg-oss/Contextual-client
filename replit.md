@@ -76,6 +76,7 @@ Tagline: "Intelligent Unification"
 - `GET /api/wa/customers/:id/participants` - Get group participants (with optional `?includePhotos=true`)
 - `POST /api/wa/customers/:id/messages` - Send message (supports text and attachments)
 - `POST /api/wa/customers/sync` - Sync customers from WhatsApp
+- `GET /api/wa/customers/:id/settings` - Get group permission settings
 - `PATCH /api/wa/customers/:id/settings` - Update group permission settings
 - `GET /api/wa/whatsapp/messages/:chatId` - Import historical messages from WhatsApp servers
 
@@ -128,6 +129,7 @@ All components use Shadcn UI primitives with consistent styling:
 - Updated attachment sending to use multipart/form-data (matching WhatsApp server API)
 - Group settings now passed to WhatsApp server when creating groups (membersCanEditSettings, membersCanSendMessages, membersCanAddMembers)
 - Disabled "Admins approve new members" toggle (not supported by WhatsApp API)
+- GroupSettingsPanel now fetches actual settings from WhatsApp server (GET endpoint) with loading states and error handling
 
 ## User Preferences
 - Professional, clean interface
