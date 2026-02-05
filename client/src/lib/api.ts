@@ -193,7 +193,17 @@ export function useSendPoll() {
       
       const url = `/api/wa/customers/${encodeURIComponent(customerId)}/poll`;
       const res = await apiRequest("POST", url, { question, options, allowMultipleAnswers });
-      return res.json();
+      const data = await res.json();
+      
+      if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+        throw new Error("Poll endpoint returned empty response - poll feature may not be supported by the WhatsApp server");
+      }
+      
+      if (data.error) {
+        throw new Error(data.message || data.error);
+      }
+      
+      return data;
     },
     onSuccess: async (response, variables) => {
       if (response.message) {
@@ -224,6 +234,10 @@ export function useSendPoll() {
       
       queryClient.invalidateQueries({
         queryKey: ["/api/wa/customers"],
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/wa/customers", variables.customerId, "messages"],
       });
     },
   });

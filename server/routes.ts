@@ -403,13 +403,17 @@ export async function registerRoutes(
   // Send poll to a customer (WhatsApp group)
   app.post("/api/wa/customers/:id/poll", async (req: Request, res: Response) => {
     const { id } = req.params;
+    console.log("[poll] Received poll request for:", id, "body:", JSON.stringify(req.body));
     const parsed = sendPollSchema.safeParse(req.body);
     
     if (!parsed.success) {
+      console.log("[poll] Validation failed:", parsed.error.errors);
       return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
     }
     
+    console.log("[poll] Sending to WhatsApp server:", parsed.data);
     const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(id)}/poll`, parsed.data);
+    console.log("[poll] WhatsApp response status:", status, "data:", JSON.stringify(data));
     res.status(status).json(data);
   });
 
