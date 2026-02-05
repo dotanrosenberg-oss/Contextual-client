@@ -576,7 +576,8 @@ export function useGroupSettings(groupId: string | null) {
   return useQuery<GroupSettingsResponse>({
     queryKey: [`/api/wa/customers/${groupId}/settings`],
     enabled: !!groupId,
-    staleTime: 60000,
+    staleTime: 5000,
+    refetchOnMount: 'always',
   });
 }
 
