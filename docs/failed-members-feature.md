@@ -48,11 +48,6 @@ Handle cases where members cannot be added to WhatsApp groups due to privacy set
    - Opens FailedMembersDialog on click
    - Only visible when there are failed members
 
-3. **Add Members Dialog** - Dialog for adding new members to existing groups:
-   - Phone number input (supports multiple numbers)
-   - Calls server to add members
-   - Handles failures by storing them in failed_participants
-
 ### State Management
 
 - Failed participants stored in existing `failed_participants` database table
