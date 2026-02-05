@@ -544,6 +544,43 @@ export function useCreateGroup() {
   });
 }
 
+export interface AddMembersPayload {
+  groupId: string;
+  participants: string[];
+}
+
+export interface AddMembersResponse {
+  success: boolean;
+  results?: {
+    added?: Array<{ number: string }>;
+    failed?: Array<{ number: string; reason?: string }>;
+  };
+  summary?: {
+    successfullyAdded: number;
+    failed: number;
+  };
+}
+
+export function useAddMembers() {
+  const qc = useQueryClient();
+
+  return useMutation<AddMembersResponse, Error, AddMembersPayload>({
+    mutationFn: async (payload) => {
+      const res = await apiRequest("POST", "/api/wa/groups/add-members", payload);
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || data.error || "Failed to add members");
+      }
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: [`/api/wa/customers/${variables.groupId}/participants`] });
+      qc.invalidateQueries({ queryKey: [`/api/customers/${variables.groupId}/failed-participants`] });
+      qc.invalidateQueries({ queryKey: ["/api/wa/customers"] });
+    },
+  });
+}
+
 export function useImportHistory() {
   const qc = useQueryClient();
   
