@@ -368,7 +368,7 @@ function ChatView() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="participants" className="flex-1 mt-0 overflow-hidden">
-                <ParticipantList groupId={selectedCustomerId} groupName={selectedCustomer?.name} includePhotos={true} />
+                <ParticipantList groupId={selectedCustomerId} includePhotos={true} />
               </TabsContent>
               <TabsContent value="settings" className="flex-1 mt-0 overflow-hidden">
                 <GroupSettingsPanel 
@@ -379,7 +379,7 @@ function ChatView() {
             </Tabs>
           )}
           {selectedCustomerId && (!selectedCustomer?.participantCount || selectedCustomer.participantCount === 0) && (
-            <ParticipantList groupId={selectedCustomerId} groupName={selectedCustomer?.name} includePhotos={true} />
+            <ParticipantList groupId={selectedCustomerId} includePhotos={true} />
           )}
         </SheetContent>
       </Sheet>

@@ -531,21 +531,6 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
-  const addMembersSchema = z.object({
-    groupId: z.string(),
-    participants: z.array(z.string()).min(1, "At least one participant required"),
-  });
-
-  app.post("/api/wa/groups/add-members", async (req: Request, res: Response) => {
-    const parsed = addMembersSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.errors[0]?.message || "Invalid request body" });
-    }
-    const { groupId, participants } = parsed.data;
-    const { status, data } = await makeWaRequest("POST", `/api/customers/${encodeURIComponent(groupId)}/participants/add`, { participants });
-    res.status(status).json(data);
-  });
-
   app.get("/api/wa/whatsapp/messages/:chatId", async (req: Request, res: Response) => {
     const { chatId } = req.params;
     const limitResult = limitQuerySchema.safeParse(req.query.limit);

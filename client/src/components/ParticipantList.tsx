@@ -7,13 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { FailedMembersDialog } from "./FailedMembersDialog";
-import { AddMembersDialog } from "./AddMembersDialog";
 import { AlertCircle, RefreshCw, Search, Phone, Users } from "lucide-react";
 import type { Participant } from "@shared/schema";
 
 interface ParticipantListProps {
   groupId: string;
-  groupName?: string;
   includePhotos?: boolean;
 }
 
@@ -78,7 +76,7 @@ function LoadingSkeleton() {
   );
 }
 
-export function ParticipantList({ groupId, groupName, includePhotos = false }: ParticipantListProps) {
+export function ParticipantList({ groupId, includePhotos = false }: ParticipantListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const { data: participants = [], isLoading, error, refetch, isRefetching } = useGroupParticipants(groupId, includePhotos);
 
@@ -157,9 +155,6 @@ export function ParticipantList({ groupId, groupName, includePhotos = false }: P
         </div>
         <div className="flex items-center gap-2">
           <FailedMembersDialog groupId={groupId} />
-          {groupName && (
-            <AddMembersDialog groupId={groupId} groupName={groupName} />
-          )}
           <Button
             variant="ghost"
             size="icon"
