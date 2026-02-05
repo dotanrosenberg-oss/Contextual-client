@@ -799,7 +799,7 @@ Respond in JSON format with the following structure:
 
       const { status, data } = await makeWaRequest("POST", "/api/groups/join-url", {
         groupId,
-        phoneNumber,
+        userId: phoneNumber,
       });
 
       if (status !== 200 || !data || typeof data !== "object") {
