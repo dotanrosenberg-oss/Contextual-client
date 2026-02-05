@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Search, Settings, AlertCircle, Smartphone, Users } from "lucide-react";
+import { Search, Settings, AlertCircle, Smartphone, Users, MessageSquare } from "lucide-react";
 import logoImage from "@assets/Gemini_Generated_Image_f014s7f014s7f014_1769729881969.png";
 import {
   Sidebar,
@@ -146,6 +146,18 @@ export function AppSidebar({
         <CreateGroupDialog disabled={serviceStatus !== "connected"} />
         <SyncButton disabled={serviceStatus !== "connected"} />
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location === "/"}
+              data-testid="button-messages"
+            >
+              <Link href="/">
+                <MessageSquare className="h-4 w-4" />
+                <span>Messages</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
