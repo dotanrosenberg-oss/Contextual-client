@@ -75,6 +75,8 @@ Tagline: "Intelligent Unification"
 - `GET /api/wa/customers/:id/messages` - Get messages (local database)
 - `GET /api/wa/customers/:id/participants` - Get group participants (with optional `?includePhotos=true`)
 - `POST /api/wa/customers/:id/messages` - Send message (supports text and attachments)
+- `PATCH /api/wa/customers/:id/messages/:messageId` - Edit a sent text message
+- `DELETE /api/wa/customers/:id/messages/:messageId` - Delete a sent message (all types)
 - `POST /api/wa/customers/sync` - Sync customers from WhatsApp
 - `GET /api/wa/customers/:id/settings` - Get group permission settings
 - `PATCH /api/wa/customers/:id/settings` - Update group permission settings
@@ -131,6 +133,12 @@ All components use Shadcn UI primitives with consistent styling:
 - Group settings now passed to WhatsApp server when creating groups (membersCanEditSettings, membersCanSendMessages, membersCanAddMembers)
 - Disabled "Admins approve new members" toggle (not supported by WhatsApp API)
 - GroupSettingsPanel now fetches actual settings from WhatsApp server (GET endpoint) with loading states and error handling
+- Added message editing support - users can edit their own sent text messages via PATCH endpoint
+- MessageBubble shows edit icon (visibility-toggled on hover) for own text messages with inline editing mode
+- "edited" indicator displayed next to timestamp for edited messages
+- Added message deletion support - users can delete their own sent messages (all types: text, media, poll) via DELETE endpoint
+- MessageBubble shows trash icon on hover for own messages with two-step confirmation (click trash → confirm or cancel)
+- WebSocket handler for message_delete event removes deleted messages from React Query cache and IndexedDB in real-time
 
 ## User Preferences
 - Professional, clean interface

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { cacheMessage, cacheMessages, updateCachedCustomer, updateSyncMeta } from "@/lib/messageCache";
+import { cacheMessage, cacheMessages, updateCachedCustomer, updateSyncMeta, deleteCachedMessage } from "@/lib/messageCache";
 import type { Message, Customer } from "@shared/schema";
 
 export interface WebSocketMessage {
@@ -113,6 +113,27 @@ export function useWebSocket({ apiKey, onMessage }: UseWebSocketOptions) {
             }
           }
           
+          if (message.type === "message_delete") {
+            const deleteData = message.data as { messageId?: string; customerId?: string };
+            if (deleteData?.messageId) {
+              await deleteCachedMessage(deleteData.messageId).catch(() => {});
+
+              if (deleteData.customerId) {
+                queryClient.setQueryData<Message[]>(
+                  ["/api/wa/customers", deleteData.customerId, "messages"],
+                  (old) => {
+                    if (!old) return old;
+                    return old.filter((m) => m.id !== deleteData.messageId);
+                  }
+                );
+              }
+
+              queryClient.invalidateQueries({
+                queryKey: ["/api/wa/customers"],
+              });
+            }
+          }
+
           if (message.type === "customer_update") {
             const custData = message.data as { customer?: Customer };
             if (custData?.customer) {

@@ -25,7 +25,7 @@ import { ParticipantList } from "./components/ParticipantList";
 import { GroupSettingsPanel } from "./components/GroupSettingsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, AlertCircle, Settings, Download, Loader2, Users } from "lucide-react";
-import { useCustomers, useMessages, useSendMessage, useSendPoll, useServerStatus, useSettings, useImportHistory } from "./lib/api";
+import { useCustomers, useMessages, useSendMessage, useSendPoll, useEditMessage, useDeleteMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
 import { PollComposer } from "./components/PollComposer";
 import type { Attachment } from "./components/MessageInput";
 import { useToast } from "@/hooks/use-toast";
@@ -55,7 +55,11 @@ function ChatView() {
   
   const sendMessageMutation = useSendMessage();
   const sendPollMutation = useSendPoll();
+  const editMessageMutation = useEditMessage();
+  const deleteMessageMutation = useDeleteMessage();
   const importHistoryMutation = useImportHistory();
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
   const isServiceConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
   const isServerReachable = !serverStatusError && serverStatus !== undefined;
@@ -157,6 +161,49 @@ function ChatView() {
         description: (error as Error).message,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleEditMessage = async (messageId: string, newText: string) => {
+    if (!selectedCustomerId) return;
+
+    setEditingMessageId(messageId);
+    try {
+      await editMessageMutation.mutateAsync({
+        customerId: selectedCustomerId,
+        messageId,
+        message: newText,
+      });
+    } catch (error) {
+      console.error("Failed to edit message:", error);
+      toast({
+        title: "Failed to edit message",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setEditingMessageId(null);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!selectedCustomerId) return;
+
+    setDeletingMessageId(messageId);
+    try {
+      await deleteMessageMutation.mutateAsync({
+        customerId: selectedCustomerId,
+        messageId,
+      });
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+      toast({
+        title: "Failed to delete message",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingMessageId(null);
     }
   };
 
@@ -295,7 +342,7 @@ function ChatView() {
                       )
                     ) : (
                       messages.map((message) => {
-                        const msg = message as typeof message & { pollQuestion?: string | null; pollOptions?: string[] | null };
+                        const msg = message as typeof message & { pollQuestion?: string | null; pollOptions?: string[] | null; isEdited?: boolean };
                         return (
                           <MessageBubble
                             key={msg.id}
@@ -308,6 +355,11 @@ function ChatView() {
                             messageType={msg.messageType}
                             pollQuestion={msg.pollQuestion}
                             pollOptions={msg.pollOptions}
+                            isEdited={msg.isEdited}
+                            onEdit={handleEditMessage}
+                            isEditPending={editingMessageId === msg.id && editMessageMutation.isPending}
+                            onDelete={handleDeleteMessage}
+                            isDeletePending={deletingMessageId === msg.id && deleteMessageMutation.isPending}
                           />
                         );
                       })
