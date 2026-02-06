@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { 
   FileText, 
@@ -10,8 +11,14 @@ import {
   File,
   Download,
   BarChart3,
-  Circle
+  Circle,
+  Pencil,
+  Check,
+  X,
+  Loader2
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface MessageBubbleProps {
   id: string;
@@ -26,6 +33,9 @@ interface MessageBubbleProps {
   filename?: string | null;
   pollQuestion?: string | null;
   pollOptions?: string[] | null;
+  isEdited?: boolean;
+  onEdit?: (messageId: string, newText: string) => void;
+  isEditPending?: boolean;
 }
 
 function formatMessageTime(date: Date): string {
@@ -235,64 +245,191 @@ export function MessageBubble({
   filename,
   pollQuestion,
   pollOptions,
+  isEdited,
+  onEdit,
+  isEditPending,
 }: MessageBubbleProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(body);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const showMedia = hasMedia || (messageType && messageType !== "text" && messageType !== "chat" && messageType !== "poll");
   const isPoll = messageType === "poll" && pollQuestion && pollOptions && pollOptions.length > 0;
+  const canEdit = isFromMe && onEdit && (!messageType || messageType === "text" || messageType === "chat") && !hasMedia && !isPoll;
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
+    }
+  }, [isEditing]);
+
+  const prevIsEditPending = useRef(isEditPending);
+  useEffect(() => {
+    if (prevIsEditPending.current && !isEditPending && isEditing) {
+      setIsEditing(false);
+    }
+    prevIsEditPending.current = isEditPending;
+  }, [isEditPending, isEditing]);
+
+  function handleStartEdit() {
+    setEditText(body);
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false);
+    setEditText(body);
+  }
+
+  function handleSaveEdit() {
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === body) {
+      handleCancelEdit();
+      return;
+    }
+    onEdit?.(id, trimmed);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveEdit();
+    }
+  }
 
   return (
     <div
       className={cn(
-        "flex w-full",
+        "group flex w-full",
         isFromMe ? "justify-end" : "justify-start"
       )}
       data-testid={`message-bubble-${id}`}
     >
-      <div
-        className={cn(
-          "max-w-[70%] px-3 py-2 rounded-lg",
-          isFromMe
-            ? "bg-primary text-primary-foreground rounded-br-none"
-            : "bg-muted rounded-bl-none"
+      <div className="flex items-start gap-1 max-w-[70%]">
+        {isFromMe && canEdit && !isEditing && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleStartEdit}
+            className="self-center invisible group-hover:visible"
+            data-testid={`button-edit-message-${id}`}
+            aria-label="Edit message"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
         )}
-      >
-        {!isFromMe && senderName && (
-          <p className="text-xs font-medium text-primary mb-1">{senderName}</p>
-        )}
-        
-        {isPoll && (
-          <div className="mb-2">
-            <PollContent
-              question={pollQuestion}
-              options={pollOptions}
-              isFromMe={isFromMe}
-            />
-          </div>
-        )}
-        
-        {showMedia && (
-          <div className="mb-2">
-            <MediaContent
-              messageType={messageType}
-              mediaUrl={mediaUrl}
-              mimetype={mimetype}
-              filename={filename}
-              isFromMe={isFromMe}
-            />
-          </div>
-        )}
-        
-        {body && !isPoll && (
-          <p className="text-sm whitespace-pre-wrap break-words">{body}</p>
-        )}
-        
-        <p
+
+        <div
           className={cn(
-            "text-xs mt-1",
-            isFromMe ? "text-primary-foreground/70" : "text-muted-foreground"
+            "px-3 py-2 rounded-lg",
+            isFromMe
+              ? "bg-primary text-primary-foreground rounded-br-none"
+              : "bg-muted rounded-bl-none"
           )}
         >
-          {formatMessageTime(timestamp)}
-        </p>
+          {!isFromMe && senderName && (
+            <p className="text-xs font-medium text-primary mb-1">{senderName}</p>
+          )}
+          
+          {isPoll && (
+            <div className="mb-2">
+              <PollContent
+                question={pollQuestion}
+                options={pollOptions}
+                isFromMe={isFromMe}
+              />
+            </div>
+          )}
+          
+          {showMedia && (
+            <div className="mb-2">
+              <MediaContent
+                messageType={messageType}
+                mediaUrl={mediaUrl}
+                mimetype={mimetype}
+                filename={filename}
+                isFromMe={isFromMe}
+              />
+            </div>
+          )}
+          
+          {isEditing ? (
+            <div className="space-y-2">
+              <Textarea
+                ref={textareaRef}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="min-h-[2rem] text-sm bg-background text-foreground border-0 resize-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={isEditPending}
+                data-testid={`input-edit-message-${id}`}
+              />
+              <div className="flex items-center justify-end gap-1">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={handleCancelEdit}
+                  disabled={isEditPending}
+                  className="text-primary-foreground/70"
+                  data-testid={`button-cancel-edit-${id}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={handleSaveEdit}
+                  disabled={isEditPending || !editText.trim() || editText.trim() === body}
+                  className="text-primary-foreground/70"
+                  data-testid={`button-save-edit-${id}`}
+                >
+                  {isEditPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {body && !isPoll && (
+                <p className="text-sm whitespace-pre-wrap break-words">{body}</p>
+              )}
+            </>
+          )}
+          
+          <div
+            className={cn(
+              "flex items-center gap-1 mt-1",
+              isFromMe ? "justify-end" : "justify-start"
+            )}
+          >
+            {isEdited && (
+              <span
+                className={cn(
+                  "text-[10px] italic",
+                  isFromMe ? "text-primary-foreground/50" : "text-muted-foreground/70"
+                )}
+                data-testid={`text-edited-indicator-${id}`}
+              >
+                edited
+              </span>
+            )}
+            <p
+              className={cn(
+                "text-xs",
+                isFromMe ? "text-primary-foreground/70" : "text-muted-foreground"
+              )}
+            >
+              {formatMessageTime(timestamp)}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

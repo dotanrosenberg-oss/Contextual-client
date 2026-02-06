@@ -308,6 +308,56 @@ export function useSendMessage() {
   });
 }
 
+interface EditMessageVariables {
+  customerId: string;
+  messageId: string;
+  message: string;
+}
+
+interface EditMessageResponse {
+  success: boolean;
+  message?: Message;
+}
+
+export function useEditMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation<EditMessageResponse, Error, EditMessageVariables>({
+    mutationFn: async ({ customerId, messageId, message }) => {
+      const url = `/api/wa/customers/${encodeURIComponent(customerId)}/messages/${encodeURIComponent(messageId)}`;
+      const res = await apiRequest("PATCH", url, { message });
+      const data = await res.json();
+
+      if (data.error) {
+        throw new Error(data.message || data.error);
+      }
+
+      return data;
+    },
+    onSuccess: async (response, variables) => {
+      const updatedMsg = response.message;
+
+      queryClient.setQueryData<Message[]>(
+        ["/api/wa/customers", variables.customerId, "messages"],
+        (old) => {
+          if (!old) return old;
+          return old.map((m) => {
+            if (m.id !== variables.messageId) return m;
+            if (updatedMsg) {
+              return { ...m, ...updatedMsg, isEdited: true };
+            }
+            return { ...m, body: variables.message, isEdited: true };
+          });
+        }
+      );
+
+      if (updatedMsg) {
+        await cacheMessages([{ ...updatedMsg, isEdited: true } as Message]).catch(() => {});
+      }
+    },
+  });
+}
+
 export function useServerStatus() {
   return useQuery<ServerStatus>({
     queryKey: ["/api/wa/status"],
