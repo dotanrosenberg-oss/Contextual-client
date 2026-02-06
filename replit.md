@@ -127,6 +127,7 @@ All components use Shadcn UI primitives with consistent styling:
 - MessageInput component with file picker, preview, and file type validation
 - MessageBubble component updated to display incoming media attachments
 - Updated attachment sending to use multipart/form-data (matching WhatsApp server API)
+- Added Failed Members management feature - "Failed" button with badge in participant list header, dialog to view failed additions with reasons, ability to request join URLs from WhatsApp server, and copy-to-clipboard for sharing invite links
 - Group settings now passed to WhatsApp server when creating groups (membersCanEditSettings, membersCanSendMessages, membersCanAddMembers)
 - Disabled "Admins approve new members" toggle (not supported by WhatsApp API)
 - GroupSettingsPanel now fetches actual settings from WhatsApp server (GET endpoint) with loading states and error handling

@@ -1,0 +1,55 @@
+## Task: Handled failed members adding
+
+### Status: Planning
+### Priority: Medium
+
+### Description
+if a user is not on WA or the privacy settings they have don't allow adding them to groups. need to build a flow that would create a url that can be sent to those users allowing them to join the group
+
+### Client-Side Implementation Requirements
+- **UI Components**:
+  - A warning dialog or notification to inform the user when adding members fails due to privacy settings or other constraints..
+  - A modal or popup with an option to generate a join URL for failed members.
+  - A list to display failed members and their statuses.
+  - A button to copy the generated URL to the clipboard.
+
+- **State Management**:
+  - Maintain a list of members being added, their statuses (successful, failed), and reasons for failure.
+  - Track the generated join URL in local state to allow users to interact with it (e.g., copy or share).
+
+- **User Interactions**:
+  - Prompt users with clear information when adding members fails.
+  - Allow users to generate join URLs via a button for each failed member or collectively for all failed members.
+  - Provide confirmation messages when a URL is successfully generated or copied.
+  - Allow re-triggering of the add-member process for failed members if circumstances change.
+
+### API Contract (for reference)
+- **Endpoint Specifications**:
+  - POST `/api/groups/add-members`:
+    - **Request**:
+      - `groupId` (string): ID of the group.
+      - `members` (array of strings): Array of user IDs.
+    - **Response**:
+      - `successfulMembers` (array): List of user IDs successfully added.
+      - `failedMembers` (array): List of user IDs with reasons for failure.
+  
+  - POST `/api/groups/join-url`:
+    - **Request**:
+      - `userId` (string): ID of the user.
+      - `groupId` (string): ID of the group.
+    - **Response**:
+      - `url` (string): Generated join URL.
+
+  - GET `/api/groups/join/:token`:
+    - **Request**:
+      - `token` (string): Unique token from the join URL.
+    - **Response**:
+      - Status of the join attempt (success, failure, expired).
+
+### Instructions
+Implement the client-side functionality based on the requirements above. Focus on:
+- UI components and user interactions
+- State management and data flow
+- API integration following the contract
+- Error handling and loading states
+- Responsive design and accessibility

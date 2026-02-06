@@ -51,8 +51,10 @@ export interface IStorage {
   saveSocialIntegration(integration: InsertSocialIntegration): Promise<SocialIntegration>;
 
   getFailedParticipants(customerId: string): Promise<FailedParticipant[]>;
+  getFailedParticipantById(id: number): Promise<FailedParticipant | undefined>;
   saveFailedParticipants(participants: InsertFailedParticipant[]): Promise<FailedParticipant[]>;
   deleteFailedParticipant(id: number): Promise<void>;
+  updateFailedParticipantJoinUrl(id: number, joinUrl: string): Promise<FailedParticipant | undefined>;
 
   getContacts(): Promise<Contact[]>;
   getContactByPhone(phone: string): Promise<Contact | undefined>;
@@ -175,6 +177,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(failedParticipants.customerId, customerId));
   }
 
+  async getFailedParticipantById(id: number): Promise<FailedParticipant | undefined> {
+    const [participant] = await db
+      .select()
+      .from(failedParticipants)
+      .where(eq(failedParticipants.id, id));
+    return participant;
+  }
+
   async saveFailedParticipants(participants: InsertFailedParticipant[]): Promise<FailedParticipant[]> {
     if (participants.length === 0) return [];
     const created = await db.insert(failedParticipants).values(participants).returning();
@@ -183,6 +193,15 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFailedParticipant(id: number): Promise<void> {
     await db.delete(failedParticipants).where(eq(failedParticipants.id, id));
+  }
+
+  async updateFailedParticipantJoinUrl(id: number, joinUrl: string): Promise<FailedParticipant | undefined> {
+    const [updated] = await db
+      .update(failedParticipants)
+      .set({ joinUrl, joinUrlRequestedAt: new Date() })
+      .where(eq(failedParticipants.id, id))
+      .returning();
+    return updated;
   }
 
   async getContacts(): Promise<Contact[]> {

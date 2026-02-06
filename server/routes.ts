@@ -773,6 +773,60 @@ Respond in JSON format with the following structure:
     }
   });
 
+  const requestJoinUrlSchema = z.object({
+    groupId: z.string(),
+    phoneNumber: z.string(),
+    failedParticipantId: z.number(),
+  });
+
+  app.post("/api/groups/join-url", async (req: Request, res: Response) => {
+    try {
+      const parsed = requestJoinUrlSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "VALIDATION_ERROR", message: parsed.error.message });
+      }
+
+      const { groupId, phoneNumber, failedParticipantId } = parsed.data;
+
+      const existingRecord = await storage.getFailedParticipantById(failedParticipantId);
+      if (!existingRecord) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Failed participant record not found" });
+      }
+
+      if (existingRecord.customerId !== groupId) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "Failed participant does not belong to this group" });
+      }
+
+      const { status, data } = await makeWaRequest("POST", "/api/groups/join-url", {
+        groupId,
+        userId: phoneNumber,
+      });
+
+      if (status !== 200 || !data || typeof data !== "object") {
+        return res.status(status).json(data || { error: "REQUEST_FAILED", message: "Failed to get join URL from WhatsApp server" });
+      }
+
+      const responseData = data as { url?: string };
+      if (!responseData.url) {
+        return res.status(500).json({ error: "NO_URL", message: "WhatsApp server did not return a join URL" });
+      }
+
+      const updated = await storage.updateFailedParticipantJoinUrl(failedParticipantId, responseData.url);
+      if (!updated) {
+        return res.status(500).json({ error: "UPDATE_FAILED", message: "Failed to update join URL in database" });
+      }
+
+      res.json({ 
+        success: true, 
+        url: responseData.url,
+        failedParticipant: updated,
+      });
+    } catch (error) {
+      console.error("Failed to request join URL:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to request join URL" });
+    }
+  });
+
   // Contacts routes
   app.get("/api/contacts", async (_req: Request, res: Response) => {
     try {
