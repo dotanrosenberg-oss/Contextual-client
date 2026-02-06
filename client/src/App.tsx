@@ -25,7 +25,7 @@ import { ParticipantList } from "./components/ParticipantList";
 import { GroupSettingsPanel } from "./components/GroupSettingsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, AlertCircle, Settings, Download, Loader2, Users } from "lucide-react";
-import { useCustomers, useMessages, useSendMessage, useSendPoll, useEditMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
+import { useCustomers, useMessages, useSendMessage, useSendPoll, useEditMessage, useDeleteMessage, useServerStatus, useSettings, useImportHistory } from "./lib/api";
 import { PollComposer } from "./components/PollComposer";
 import type { Attachment } from "./components/MessageInput";
 import { useToast } from "@/hooks/use-toast";
@@ -56,8 +56,10 @@ function ChatView() {
   const sendMessageMutation = useSendMessage();
   const sendPollMutation = useSendPoll();
   const editMessageMutation = useEditMessage();
+  const deleteMessageMutation = useDeleteMessage();
   const importHistoryMutation = useImportHistory();
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
   const isServiceConnected = serverStatus?.connected ?? serverStatus?.ready ?? false;
   const isServerReachable = !serverStatusError && serverStatus !== undefined;
@@ -181,6 +183,27 @@ function ChatView() {
       });
     } finally {
       setEditingMessageId(null);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!selectedCustomerId) return;
+
+    setDeletingMessageId(messageId);
+    try {
+      await deleteMessageMutation.mutateAsync({
+        customerId: selectedCustomerId,
+        messageId,
+      });
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+      toast({
+        title: "Failed to delete message",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingMessageId(null);
     }
   };
 
@@ -335,6 +358,8 @@ function ChatView() {
                             isEdited={msg.isEdited}
                             onEdit={handleEditMessage}
                             isEditPending={editingMessageId === msg.id && editMessageMutation.isPending}
+                            onDelete={handleDeleteMessage}
+                            isDeletePending={deletingMessageId === msg.id && deleteMessageMutation.isPending}
                           />
                         );
                       })

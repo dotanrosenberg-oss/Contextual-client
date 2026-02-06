@@ -9,6 +9,7 @@ import {
   cacheCustomers,
   getSyncMeta,
   updateSyncMeta,
+  deleteCachedMessage,
 } from "./messageCache";
 
 interface ServerStatus {
@@ -354,6 +355,52 @@ export function useEditMessage() {
       if (updatedMsg) {
         await cacheMessages([{ ...updatedMsg, isEdited: true } as Message]).catch(() => {});
       }
+    },
+  });
+}
+
+interface DeleteMessageVariables {
+  customerId: string;
+  messageId: string;
+}
+
+interface DeleteMessageResponse {
+  success: boolean;
+  messageId?: string;
+}
+
+export function useDeleteMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation<DeleteMessageResponse, Error, DeleteMessageVariables>({
+    mutationFn: async ({ customerId, messageId }) => {
+      const url = `/api/wa/customers/${encodeURIComponent(customerId)}/messages/${encodeURIComponent(messageId)}`;
+      const res = await apiRequest("DELETE", url);
+      const data = await res.json();
+
+      if (data.error) {
+        throw new Error(data.message || data.error);
+      }
+
+      return data;
+    },
+    onSuccess: async (_response, variables) => {
+      queryClient.setQueryData<Message[]>(
+        ["/api/wa/customers", variables.customerId, "messages"],
+        (old) => {
+          if (!old) return old;
+          return old.filter((m) => m.id !== variables.messageId);
+        }
+      );
+
+      await deleteCachedMessage(variables.messageId).catch(() => {});
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/wa/customers", variables.customerId, "messages"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/wa/customers"],
+      });
     },
   });
 }

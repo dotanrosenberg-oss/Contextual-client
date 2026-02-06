@@ -13,6 +13,7 @@ import {
   BarChart3,
   Circle,
   Pencil,
+  Trash2,
   Check,
   X,
   Loader2
@@ -36,6 +37,8 @@ interface MessageBubbleProps {
   isEdited?: boolean;
   onEdit?: (messageId: string, newText: string) => void;
   isEditPending?: boolean;
+  onDelete?: (messageId: string) => void;
+  isDeletePending?: boolean;
 }
 
 function formatMessageTime(date: Date): string {
@@ -248,14 +251,18 @@ export function MessageBubble({
   isEdited,
   onEdit,
   isEditPending,
+  onDelete,
+  isDeletePending,
 }: MessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(body);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const showMedia = hasMedia || (messageType && messageType !== "text" && messageType !== "chat" && messageType !== "poll");
   const isPoll = messageType === "poll" && pollQuestion && pollOptions && pollOptions.length > 0;
   const canEdit = isFromMe && onEdit && (!messageType || messageType === "text" || messageType === "chat") && !hasMedia && !isPoll;
+  const canDelete = isFromMe && onDelete;
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -273,6 +280,7 @@ export function MessageBubble({
   }, [isEditPending, isEditing]);
 
   function handleStartEdit() {
+    setConfirmDelete(false);
     setEditText(body);
     setIsEditing(true);
   }
@@ -301,6 +309,14 @@ export function MessageBubble({
     }
   }
 
+  const prevIsDeletePending = useRef(isDeletePending);
+  useEffect(() => {
+    if (prevIsDeletePending.current && !isDeletePending && confirmDelete) {
+      setConfirmDelete(false);
+    }
+    prevIsDeletePending.current = isDeletePending;
+  }, [isDeletePending, confirmDelete]);
+
   return (
     <div
       className={cn(
@@ -310,17 +326,60 @@ export function MessageBubble({
       data-testid={`message-bubble-${id}`}
     >
       <div className="flex items-start gap-1 max-w-[70%]">
-        {isFromMe && canEdit && !isEditing && (
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={handleStartEdit}
-            className="self-center invisible group-hover:visible"
-            data-testid={`button-edit-message-${id}`}
-            aria-label="Edit message"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
+        {isFromMe && !isEditing && !confirmDelete && (canEdit || canDelete) && (
+          <div className="flex flex-col self-center invisible group-hover:visible">
+            {canEdit && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleStartEdit}
+                data-testid={`button-edit-message-${id}`}
+                aria-label="Edit message"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setConfirmDelete(true)}
+                data-testid={`button-delete-message-${id}`}
+                aria-label="Delete message"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
+        {isFromMe && confirmDelete && (
+          <div className="flex items-center gap-1 self-center">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setConfirmDelete(false)}
+              disabled={isDeletePending}
+              data-testid={`button-cancel-delete-${id}`}
+              aria-label="Cancel delete"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => onDelete?.(id)}
+              disabled={isDeletePending}
+              className="text-destructive"
+              data-testid={`button-confirm-delete-${id}`}
+              aria-label="Confirm delete"
+            >
+              {isDeletePending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
         )}
 
         <div

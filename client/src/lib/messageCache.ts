@@ -106,6 +106,25 @@ export async function cacheMessage(message: Message): Promise<void> {
   return cacheMessages([message]);
 }
 
+export async function deleteCachedMessage(messageId: string): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(MESSAGES_STORE, "readwrite");
+      const store = transaction.objectStore(MESSAGES_STORE);
+      store.delete(messageId);
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => {
+        console.error("Failed to delete cached message:", transaction.error);
+        reject(transaction.error);
+      };
+    });
+  } catch (error) {
+    console.error("IndexedDB error:", error);
+  }
+}
+
 export async function getLastMessageTimestamp(customerId: string): Promise<number | null> {
   try {
     const db = await openDB();

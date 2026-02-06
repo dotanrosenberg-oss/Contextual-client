@@ -420,6 +420,15 @@ export async function registerRoutes(
     res.status(status).json(data);
   });
 
+  app.delete("/api/wa/customers/:id/messages/:messageId", async (req: Request, res: Response) => {
+    const { id, messageId } = req.params;
+    const { status, data } = await makeWaRequest(
+      "DELETE",
+      `/api/customers/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`
+    );
+    res.status(status).json(data);
+  });
+
   // Send poll to a customer (WhatsApp group)
   app.post("/api/wa/customers/:id/poll", async (req: Request, res: Response) => {
     const { id } = req.params;
