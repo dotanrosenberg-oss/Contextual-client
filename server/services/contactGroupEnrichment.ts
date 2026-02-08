@@ -158,6 +158,10 @@ export function setCachedContactEnrichment(cacheKey: string, value: ContactGroup
   });
 }
 
+export function clearContactEnrichmentCache() {
+  enrichmentCache.clear();
+}
+
 export function buildContactGroupEnrichment(args: {
   contactPhone: string;
   contactName?: string;

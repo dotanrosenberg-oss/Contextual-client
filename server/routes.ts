@@ -10,6 +10,7 @@ import FormData from "form-data";
 import * as fs from "fs";
 import * as path from "path";
 import {
+  clearContactEnrichmentCache,
   getCachedContactEnrichment,
   setCachedContactEnrichment,
   summarizeGroupMessages,
@@ -111,6 +112,16 @@ let waWebSocket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let isConnecting = false;
 const connectedClients = new Set<WebSocket>();
+
+const contactGroupsIndex = new Map<string, Set<string>>();
+const contactGroupsIndexMeta = {
+  builtAt: 0,
+  ttlMs: 10 * 60 * 1000,
+};
+
+function normalizePhoneForIndex(phone: string): string {
+  return phone.replace(/[^\d]/g, "");
+}
 
 function setupWaWebSocket() {
   if (isConnecting) return;
@@ -897,6 +908,8 @@ Respond in JSON format with the following structure:
       
       let totalSynced = 0;
       let groupsProcessed = 0;
+
+      const nextIndex = new Map<string, Set<string>>();
       
       console.log(`[contacts-sync] Found ${groups.length} groups to process`);
       
@@ -920,6 +933,14 @@ Respond in JSON format with the following structure:
                   name: name,
                   profilePicUrl: participant.profilePicUrl || null,
                 });
+
+                const normalizedPhone = normalizePhoneForIndex(phone);
+                if (normalizedPhone) {
+                  const set = nextIndex.get(normalizedPhone) ?? new Set<string>();
+                  set.add(group.id);
+                  nextIndex.set(normalizedPhone, set);
+                }
+
                 totalSynced++;
               } catch (err) {
                 console.error("Failed to save contact:", err);
@@ -932,6 +953,13 @@ Respond in JSON format with the following structure:
       }
       
       console.log(`[contacts-sync] Processed ${groupsProcessed} groups, synced ${totalSynced} contacts`);
+
+      contactGroupsIndex.clear();
+      for (const [phone, groupIds] of nextIndex.entries()) {
+        contactGroupsIndex.set(phone, groupIds);
+      }
+      contactGroupsIndexMeta.builtAt = Date.now();
+      clearContactEnrichmentCache();
       
       const contactList = await storage.getContacts();
       res.json({ success: true, synced: totalSynced, contacts: contactList });
@@ -994,8 +1022,44 @@ Respond in JSON format with the following structure:
         });
       }
 
+      const normalizedPhone = normalizePhoneForIndex(phone);
+      const indexIsFresh = Date.now() - contactGroupsIndexMeta.builtAt < contactGroupsIndexMeta.ttlMs;
+
+      // Build or refresh membership index on demand when stale/missing/explicit refresh.
+      if (refresh || !indexIsFresh || !contactGroupsIndex.has(normalizedPhone)) {
+        const scanGroups = customers.filter((c) => c.id.includes("@g.us"));
+
+        await Promise.allSettled(
+          scanGroups.map(async (group) => {
+            const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
+            const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
+
+            if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
+              return;
+            }
+
+            const participantsRaw = (participantsData as { participants?: unknown }).participants;
+            const participants = Array.isArray(participantsRaw)
+              ? participantsRaw.filter((p): p is { phone?: string } => !!p && typeof p === "object")
+              : [];
+
+            for (const participant of participants) {
+              const participantPhone = normalizePhoneForIndex(participant.phone || "");
+              if (!participantPhone) continue;
+              const set = contactGroupsIndex.get(participantPhone) ?? new Set<string>();
+              set.add(group.id);
+              contactGroupsIndex.set(participantPhone, set);
+            }
+          }),
+        );
+
+        contactGroupsIndexMeta.builtAt = Date.now();
+      }
+
+      const matchedGroupIds = contactGroupsIndex.get(normalizedPhone) ?? new Set<string>();
+
       const groups = customers
-        .filter((c) => c.id.includes("@g.us"))
+        .filter((c) => c.id.includes("@g.us") && matchedGroupIds.has(c.id))
         .map((group) => ({
           groupId: group.id,
           groupName: group.name || group.id,
