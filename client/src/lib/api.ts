@@ -806,6 +806,52 @@ export function useUpdateGroupSettings() {
   });
 }
 
+export interface ContactGroupSummary {
+  mainTopics: string[];
+  keyDecisions: string[];
+  openAsksOrBlockers: string[];
+  contactMentions: string[];
+  lastActivityAt: string | null;
+}
+
+export interface ContactGroupEnrichmentItem {
+  groupId: string;
+  groupName: string;
+  participantCount: number | null;
+  avatarUrl: string | null;
+  summary: ContactGroupSummary;
+}
+
+export interface ContactGroupEnrichmentResponse {
+  contactPhone: string;
+  generatedAt: string;
+  cached: boolean;
+  groups: ContactGroupEnrichmentItem[];
+}
+
+export function useContactGroupEnrichment(phone: string | null, refresh: boolean = false) {
+  return useQuery<ContactGroupEnrichmentResponse | null>({
+    queryKey: ["/api/contacts", phone, "group-enrichment", refresh],
+    enabled: !!phone,
+    staleTime: 2 * 60 * 1000,
+    queryFn: async () => {
+      if (!phone) return null;
+      const suffix = refresh ? "?refresh=true" : "";
+      const res = await fetch(`/api/contacts/${encodeURIComponent(phone)}/group-enrichment${suffix}`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+
+      return res.json();
+    },
+  });
+}
+
 interface RequestJoinUrlPayload {
   groupId: string;
   phoneNumber: string;

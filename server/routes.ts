@@ -9,6 +9,11 @@ import multer from "multer";
 import FormData from "form-data";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  buildContactGroupEnrichment,
+  getCachedContactEnrichment,
+  setCachedContactEnrichment,
+} from "./services/contactGroupEnrichment";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -921,6 +926,99 @@ Respond in JSON format with the following structure:
     } catch (error) {
       console.error("Failed to sync contacts:", error);
       res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to sync contacts" });
+    }
+  });
+
+  app.get("/api/contacts/:phone/group-enrichment", async (req: Request, res: Response) => {
+    const featureEnabled = process.env.ENABLE_CONTACT_GROUP_ENRICHMENT !== "false";
+    if (!featureEnabled) {
+      return res.status(404).json({
+        error: "FEATURE_DISABLED",
+        message: "Group enrichment is disabled",
+      });
+    }
+
+    try {
+      const { phone } = req.params;
+      const refresh = req.query.refresh === "true";
+      const cacheKey = `contact-group-enrichment:${phone}`;
+
+      if (!refresh) {
+        const cached = getCachedContactEnrichment(cacheKey);
+        if (cached) {
+          return res.json({ ...cached, cached: true });
+        }
+      }
+
+      const contact = await storage.getContactByPhone(phone);
+      if (!contact) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Contact not found" });
+      }
+
+      const { status: customersStatus, data: customersData } = await makeWaRequest("GET", "/api/customers");
+      if (customersStatus !== 200 || !Array.isArray(customersData)) {
+        return res.status(502).json({
+          error: "UPSTREAM_ERROR",
+          message: "Failed to fetch groups from WhatsApp service",
+        });
+      }
+
+      const customers = customersData.filter(
+        (value): value is { id: string; name?: string; participantCount?: number; avatarUrl?: string | null } =>
+          !!value && typeof value === "object" && "id" in value && typeof (value as { id: unknown }).id === "string",
+      );
+
+      const groups = customers.filter((c) => c.id.includes("@g.us"));
+
+      const participantsByGroup = new Map<string, Array<{ phone?: string; name?: string }>>();
+      const messagesByGroup = new Map<string, Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>>();
+
+      for (const group of groups) {
+        const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
+        const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
+
+        if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
+          continue;
+        }
+
+        const participantsRaw = (participantsData as { participants?: unknown }).participants;
+        const participants = Array.isArray(participantsRaw)
+          ? participantsRaw.filter(
+              (p): p is { phone?: string; name?: string } => !!p && typeof p === "object",
+            )
+          : [];
+
+        participantsByGroup.set(group.id, participants);
+
+        const messagesPath = `/api/customers/${encodeURIComponent(group.id)}/messages?limit=80`;
+        const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", messagesPath);
+
+        if (messagesStatus === 200 && Array.isArray(messagesData)) {
+          messagesByGroup.set(group.id, messagesData as Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>);
+        } else if (
+          messagesStatus === 200 &&
+          messagesData &&
+          typeof messagesData === "object" &&
+          "messages" in messagesData &&
+          Array.isArray((messagesData as { messages?: unknown }).messages)
+        ) {
+          messagesByGroup.set(group.id, (messagesData as { messages: Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> }).messages);
+        }
+      }
+
+      const payload = buildContactGroupEnrichment({
+        contactPhone: phone,
+        contactName: contact.name,
+        customers,
+        participantsByGroup,
+        messagesByGroup,
+      });
+
+      setCachedContactEnrichment(cacheKey, payload);
+      res.json({ ...payload, cached: false });
+    } catch (error) {
+      console.error("Failed to get contact group enrichment:", error);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve contact group enrichment" });
     }
   });
 
