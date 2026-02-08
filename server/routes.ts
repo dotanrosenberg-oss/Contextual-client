@@ -972,6 +972,7 @@ Respond in JSON format with the following structure:
 
       const participantsByGroup = new Map<string, Array<{ phone?: string; name?: string }>>();
       const messagesByGroup = new Map<string, Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>>();
+      const normalizedTargetPhone = phone.replace(/[^\d]/g, "");
 
       for (const group of groups) {
         const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
@@ -989,6 +990,13 @@ Respond in JSON format with the following structure:
           : [];
 
         participantsByGroup.set(group.id, participants);
+
+        const contactIsInGroup = participants.some(
+          (p) => (p.phone || "").replace(/[^\d]/g, "") === normalizedTargetPhone,
+        );
+        if (!contactIsInGroup) {
+          continue;
+        }
 
         const messagesPath = `/api/customers/${encodeURIComponent(group.id)}/messages?limit=80`;
         const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", messagesPath);
