@@ -59,7 +59,7 @@ export function AppSidebar({
     });
 
   return (
-    <Sidebar data-testid="app-sidebar">
+    <Sidebar collapsible="none" variant="sidebar" data-testid="app-sidebar">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <img src={logoImage} alt="Contextify" className="h-10 w-10 rounded-lg" />
