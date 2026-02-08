@@ -81,15 +81,27 @@ async function makeWaRequest(
   };
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     const data = await response.json().catch(() => ({}));
     return { status: response.status, data };
   } catch (error) {
+    const isAbort = error instanceof Error && error.name === "AbortError";
+    if (isAbort) {
+      console.warn("WhatsApp server request timed out:", url);
+      return { status: 504, data: { error: "UPSTREAM_TIMEOUT", message: "WhatsApp server request timed out" } };
+    }
+
     console.error("WhatsApp server request failed:", error);
     return { status: 503, data: { error: "CONNECTION_FAILED", message: "Failed to connect to WhatsApp server" } };
   }
