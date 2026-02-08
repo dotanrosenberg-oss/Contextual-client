@@ -836,14 +836,14 @@ export interface ContactGroupOnDemandSummaryResponse {
   summary: ContactGroupSummary;
 }
 
-export function useContactGroupEnrichment(phone: string | null, refresh: boolean = false) {
+export function useContactGroupEnrichment(phone: string | null, refreshToken: number = 0) {
   return useQuery<ContactGroupEnrichmentResponse | null>({
-    queryKey: ["/api/contacts", phone, "group-enrichment", refresh],
+    queryKey: ["/api/contacts", phone, "group-enrichment", refreshToken],
     enabled: !!phone,
     staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       if (!phone) return null;
-      const suffix = refresh ? "?refresh=true" : "";
+      const suffix = refreshToken > 0 ? "?refresh=true" : "";
       const res = await fetch(`/api/contacts/${encodeURIComponent(phone)}/group-enrichment${suffix}`, {
         credentials: "include",
       });

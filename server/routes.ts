@@ -10,7 +10,6 @@ import FormData from "form-data";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  buildContactGroupEnrichment,
   getCachedContactEnrichment,
   setCachedContactEnrichment,
   summarizeGroupMessages,
@@ -981,53 +980,27 @@ Respond in JSON format with the following structure:
           !!value && typeof value === "object" && "id" in value && typeof (value as { id: unknown }).id === "string",
       );
 
-      const groups = customers.filter((c) => c.id.includes("@g.us"));
+      const groups = customers
+        .filter((c) => c.id.includes("@g.us"))
+        .map((group) => ({
+          groupId: group.id,
+          groupName: group.name || group.id,
+          participantCount: group.participantCount ?? null,
+          avatarUrl: group.avatarUrl ?? null,
+          summary: {
+            mainTopics: [],
+            keyDecisions: [],
+            openAsksOrBlockers: [],
+            contactMentions: [],
+            lastActivityAt: null,
+          },
+        }));
 
-      const participantsByGroup = new Map<string, Array<{ phone?: string; name?: string }>>();
-      const normalizedTargetPhone = phone.replace(/[^\d]/g, "");
-
-      // Lightweight pass: fetch participants only (no message pull), so load is low by default.
-      const participantResults = await Promise.allSettled(
-        groups.map(async (group) => {
-          const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
-          const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
-
-          if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
-            return { groupId: group.id, participants: [] as Array<{ phone?: string; name?: string }> };
-          }
-
-          const participantsRaw = (participantsData as { participants?: unknown }).participants;
-          const participants = Array.isArray(participantsRaw)
-            ? participantsRaw.filter(
-                (p): p is { phone?: string; name?: string } => !!p && typeof p === "object",
-              )
-            : [];
-
-          return { groupId: group.id, participants };
-        }),
-      );
-
-      for (const result of participantResults) {
-        if (result.status !== "fulfilled") continue;
-        const { groupId, participants } = result.value;
-
-        const contactIsInGroup = participants.some(
-          (p) => (p.phone || "").replace(/[^\d]/g, "") === normalizedTargetPhone,
-        );
-
-        if (contactIsInGroup) {
-          participantsByGroup.set(groupId, participants);
-        }
-      }
-
-      // No message import by default. Summaries are loaded on-demand per group.
-      const payload = buildContactGroupEnrichment({
+      const payload = {
         contactPhone: phone,
-        contactName: contact.name,
-        customers,
-        participantsByGroup,
-        messagesByGroup: new Map(),
-      });
+        generatedAt: new Date().toISOString(),
+        groups,
+      };
 
       setCachedContactEnrichment(cacheKey, payload);
       res.json({ ...payload, cached: false });

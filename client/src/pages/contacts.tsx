@@ -44,7 +44,7 @@ export default function ContactsPage() {
 
   const { data: enrichment, isLoading: enrichmentLoading, error: enrichmentError } = useContactGroupEnrichment(
     selectedPhone,
-    refreshSeed > 0,
+    refreshSeed,
   );
 
   const loadGroupSummary = useLoadContactGroupSummary();
@@ -85,6 +85,12 @@ export default function ContactsPage() {
     setGroupSummaries({});
     setLoadingGroupId(null);
   }, [selectedPhone]);
+
+  useEffect(() => {
+    if (refreshSeed > 0 && enrichment) {
+      setRefreshSeed(0);
+    }
+  }, [refreshSeed, enrichment]);
 
   return (
     <div className="flex h-full">
