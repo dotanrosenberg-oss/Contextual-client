@@ -967,18 +967,32 @@ Respond in JSON format with the following structure:
         return res.status(404).json({ error: "NOT_FOUND", message: "Contact not found" });
       }
 
-      const { status: customersStatus, data: customersData } = await makeWaRequest("GET", "/api/customers");
-      if (customersStatus !== 200 || !Array.isArray(customersData)) {
+      const loadCustomers = async () => {
+        const { status, data } = await makeWaRequest("GET", "/api/customers");
+        if (status !== 200 || !Array.isArray(data)) {
+          return [] as Array<{ id: string; name?: string; participantCount?: number; avatarUrl?: string | null }>;
+        }
+
+        return data.filter(
+          (value): value is { id: string; name?: string; participantCount?: number; avatarUrl?: string | null } =>
+            !!value && typeof value === "object" && "id" in value && typeof (value as { id: unknown }).id === "string",
+        );
+      };
+
+      let customers = await loadCustomers();
+
+      // If groups are missing locally, trigger upstream sync once, then retry.
+      if (!customers.some((c) => c.id.includes("@g.us"))) {
+        await makeWaRequest("POST", "/api/customers/sync");
+        customers = await loadCustomers();
+      }
+
+      if (customers.length === 0) {
         return res.status(502).json({
           error: "UPSTREAM_ERROR",
           message: "Failed to fetch groups from WhatsApp service",
         });
       }
-
-      const customers = customersData.filter(
-        (value): value is { id: string; name?: string; participantCount?: number; avatarUrl?: string | null } =>
-          !!value && typeof value === "object" && "id" in value && typeof (value as { id: unknown }).id === "string",
-      );
 
       const groups = customers
         .filter((c) => c.id.includes("@g.us"))
