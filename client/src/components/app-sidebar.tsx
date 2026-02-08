@@ -32,6 +32,7 @@ interface AppSidebarProps {
   isLoading?: boolean;
   error?: Error | null;
   isWhatsAppNotLinked?: boolean;
+  contactsMode?: boolean;
 }
 
 export function AppSidebar({
@@ -44,6 +45,7 @@ export function AppSidebar({
   isLoading = false,
   error = null,
   isWhatsAppNotLinked = false,
+  contactsMode = false,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [location] = useLocation();
@@ -71,80 +73,86 @@ export function AppSidebar({
         <ConnectionStatus serverStatus={serverStatus} serviceStatus={serviceStatus} className="mt-2" />
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent className="px-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search chats..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8"
-                data-testid="input-search-customers"
-              />
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {!contactsMode && (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent className="px-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                  data-testid="input-search-customers"
+                />
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-        <SidebarGroup className="flex-1">
-          <SidebarGroupContent className="px-2">
-            <ScrollArea className="h-[calc(100vh-220px)]">
-              <SidebarMenu>
-                {isLoading ? (
-                  <div className="space-y-2 p-2">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className="flex items-center gap-3 p-2">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-3 w-32" />
+          <SidebarGroup className="flex-1">
+            <SidebarGroupContent className="px-2">
+              <ScrollArea className="h-[calc(100vh-220px)]">
+                <SidebarMenu>
+                  {isLoading ? (
+                    <div className="space-y-2 p-2">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="flex items-center gap-3 p-2">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-3 w-32" />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : isWhatsAppNotLinked ? (
-                  <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
-                    <Smartphone className="h-8 w-8 text-amber-500" />
-                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">WhatsApp Not Linked</p>
-                    <p className="text-xs text-muted-foreground">Connect your WhatsApp to see chats</p>
-                  </div>
-                ) : error ? (
-                  <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
-                    <AlertCircle className="h-8 w-8 text-destructive" />
-                    <p className="text-sm font-medium text-destructive">Failed to load chats</p>
-                    <p className="text-xs text-muted-foreground">{error.message}</p>
-                  </div>
-                ) : filteredCustomers.length === 0 ? (
-                  <div className="text-center py-8 text-sm text-muted-foreground">
-                    {searchQuery ? "No chats found" : "No conversations yet"}
-                  </div>
-                ) : (
-                  filteredCustomers.map((customer) => (
-                    <SidebarMenuItem key={customer.id}>
-                      <CustomerListItem
-                        id={customer.id}
-                        name={customer.name}
-                        avatarUrl={customer.avatarUrl}
-                        lastMessage={customer.lastMessage}
-                        lastMessageTime={customer.lastMessageTime}
-                        unreadCount={customer.unreadCount ?? 0}
-                        isSelected={selectedCustomerId === customer.id}
-                        onClick={() => onSelectCustomer?.(customer.id)}
-                      />
-                    </SidebarMenuItem>
-                  ))
-                )}
-              </SidebarMenu>
-            </ScrollArea>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+                      ))}
+                    </div>
+                  ) : isWhatsAppNotLinked ? (
+                    <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
+                      <Smartphone className="h-8 w-8 text-amber-500" />
+                      <p className="text-sm font-medium text-amber-600 dark:text-amber-400">WhatsApp Not Linked</p>
+                      <p className="text-xs text-muted-foreground">Connect your WhatsApp to see chats</p>
+                    </div>
+                  ) : error ? (
+                    <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
+                      <AlertCircle className="h-8 w-8 text-destructive" />
+                      <p className="text-sm font-medium text-destructive">Failed to load chats</p>
+                      <p className="text-xs text-muted-foreground">{error.message}</p>
+                    </div>
+                  ) : filteredCustomers.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-muted-foreground">
+                      {searchQuery ? "No chats found" : "No conversations yet"}
+                    </div>
+                  ) : (
+                    filteredCustomers.map((customer) => (
+                      <SidebarMenuItem key={customer.id}>
+                        <CustomerListItem
+                          id={customer.id}
+                          name={customer.name}
+                          avatarUrl={customer.avatarUrl}
+                          lastMessage={customer.lastMessage}
+                          lastMessageTime={customer.lastMessageTime}
+                          unreadCount={customer.unreadCount ?? 0}
+                          isSelected={selectedCustomerId === customer.id}
+                          onClick={() => onSelectCustomer?.(customer.id)}
+                        />
+                      </SidebarMenuItem>
+                    ))
+                  )}
+                </SidebarMenu>
+              </ScrollArea>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      )}
 
       <SidebarFooter className="p-2 space-y-2">
-        <CreateGroupDialog disabled={serviceStatus !== "connected"} />
-        <SyncButton disabled={serviceStatus !== "connected"} />
+        {!contactsMode && (
+          <>
+            <CreateGroupDialog disabled={serviceStatus !== "connected"} />
+            <SyncButton disabled={serviceStatus !== "connected"} />
+          </>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

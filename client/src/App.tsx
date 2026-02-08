@@ -482,6 +482,7 @@ function ContactsWrapper() {
         serviceStatus={getServiceStatus()}
         onSettingsClick={() => setSettingsOpen(true)}
         isLoading={false}
+        contactsMode={true}
       />
       <main className="flex flex-1 overflow-hidden">
         <div className="flex flex-col flex-1 min-w-0">
