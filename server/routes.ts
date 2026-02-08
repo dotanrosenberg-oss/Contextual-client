@@ -986,44 +986,75 @@ Respond in JSON format with the following structure:
       const messagesByGroup = new Map<string, Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>>();
       const normalizedTargetPhone = phone.replace(/[^\d]/g, "");
 
-      for (const group of groups) {
-        const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
-        const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
+      // Pull participants for all groups in parallel so this endpoint doesn't hang on large group sets.
+      const participantResults = await Promise.allSettled(
+        groups.map(async (group) => {
+          const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
+          const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
 
-        if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
-          continue;
-        }
+          if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
+            return { groupId: group.id, participants: [] as Array<{ phone?: string; name?: string }> };
+          }
 
-        const participantsRaw = (participantsData as { participants?: unknown }).participants;
-        const participants = Array.isArray(participantsRaw)
-          ? participantsRaw.filter(
-              (p): p is { phone?: string; name?: string } => !!p && typeof p === "object",
-            )
-          : [];
+          const participantsRaw = (participantsData as { participants?: unknown }).participants;
+          const participants = Array.isArray(participantsRaw)
+            ? participantsRaw.filter(
+                (p): p is { phone?: string; name?: string } => !!p && typeof p === "object",
+              )
+            : [];
 
-        participantsByGroup.set(group.id, participants);
+          return { groupId: group.id, participants };
+        }),
+      );
+
+      const matchedGroupIds: string[] = [];
+
+      for (const result of participantResults) {
+        if (result.status !== "fulfilled") continue;
+        const { groupId, participants } = result.value;
+        participantsByGroup.set(groupId, participants);
 
         const contactIsInGroup = participants.some(
           (p) => (p.phone || "").replace(/[^\d]/g, "") === normalizedTargetPhone,
         );
-        if (!contactIsInGroup) {
-          continue;
+        if (contactIsInGroup) {
+          matchedGroupIds.push(groupId);
         }
+      }
 
-        const messagesPath = `/api/customers/${encodeURIComponent(group.id)}/messages?limit=80`;
-        const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", messagesPath);
+      // Pull message history only for matched groups (parallel).
+      const messageResults = await Promise.allSettled(
+        matchedGroupIds.map(async (groupId) => {
+          const messagesPath = `/api/customers/${encodeURIComponent(groupId)}/messages?limit=80`;
+          const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", messagesPath);
 
-        if (messagesStatus === 200 && Array.isArray(messagesData)) {
-          messagesByGroup.set(group.id, messagesData as Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>);
-        } else if (
-          messagesStatus === 200 &&
-          messagesData &&
-          typeof messagesData === "object" &&
-          "messages" in messagesData &&
-          Array.isArray((messagesData as { messages?: unknown }).messages)
-        ) {
-          messagesByGroup.set(group.id, (messagesData as { messages: Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> }).messages);
-        }
+          if (messagesStatus === 200 && Array.isArray(messagesData)) {
+            return {
+              groupId,
+              messages: messagesData as Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>,
+            };
+          }
+
+          if (
+            messagesStatus === 200 &&
+            messagesData &&
+            typeof messagesData === "object" &&
+            "messages" in messagesData &&
+            Array.isArray((messagesData as { messages?: unknown }).messages)
+          ) {
+            return {
+              groupId,
+              messages: (messagesData as { messages: Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> }).messages,
+            };
+          }
+
+          return { groupId, messages: [] as Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> };
+        }),
+      );
+
+      for (const result of messageResults) {
+        if (result.status !== "fulfilled") continue;
+        messagesByGroup.set(result.value.groupId, result.value.messages);
       }
 
       const payload = buildContactGroupEnrichment({
