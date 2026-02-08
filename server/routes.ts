@@ -1056,26 +1056,19 @@ Respond in JSON format with the following structure:
         return res.status(404).json({ error: "NOT_FOUND", message: "Contact not found" });
       }
 
-      const participantsPath = `/api/customers/${encodeURIComponent(groupId)}/participants?includePhotos=false`;
-      const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
-      if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
-        return res.status(502).json({ error: "UPSTREAM_ERROR", message: "Failed to fetch group participants" });
-      }
-
-      const participantsRaw = (participantsData as { participants?: unknown }).participants;
-      const participants = Array.isArray(participantsRaw)
-        ? participantsRaw.filter((p): p is { phone?: string; name?: string } => !!p && typeof p === "object")
-        : [];
-
-      const normalizedTarget = phone.replace(/[^\\d]/g, "");
-      const contactIsInGroup = participants.some((p) => (p.phone || "").replace(/[^\\d]/g, "") === normalizedTarget);
-      if (!contactIsInGroup) {
-        return res.status(403).json({ error: "FORBIDDEN", message: "Contact is not a member of this group" });
-      }
-
       // On-demand import from upstream WhatsApp history endpoint.
+      // We skip a participants pre-check here because some upstream providers can fail
+      // on participants while messages are still available.
+      let messagesStatus: number;
+      let messagesData: unknown;
+
       const importPath = `/api/whatsapp/messages/${encodeURIComponent(groupId)}?limit=${limit}`;
-      const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", importPath);
+      ({ status: messagesStatus, data: messagesData } = await makeWaRequest("GET", importPath));
+
+      if (messagesStatus !== 200) {
+        const fallbackPath = `/api/customers/${encodeURIComponent(groupId)}/messages?limit=${limit}`;
+        ({ status: messagesStatus, data: messagesData } = await makeWaRequest("GET", fallbackPath));
+      }
 
       let messages: Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> = [];
       if (messagesStatus === 200 && Array.isArray(messagesData)) {
