@@ -829,6 +829,13 @@ export interface ContactGroupEnrichmentResponse {
   groups: ContactGroupEnrichmentItem[];
 }
 
+export interface ContactGroupOnDemandSummaryResponse {
+  groupId: string;
+  importedCount: number;
+  generatedAt: string;
+  summary: ContactGroupSummary;
+}
+
 export function useContactGroupEnrichment(phone: string | null, refresh: boolean = false) {
   return useQuery<ContactGroupEnrichmentResponse | null>({
     queryKey: ["/api/contacts", phone, "group-enrichment", refresh],
@@ -843,6 +850,24 @@ export function useContactGroupEnrichment(phone: string | null, refresh: boolean
 
       if (!res.ok) {
         if (res.status === 404) return null;
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+
+      return res.json();
+    },
+  });
+}
+
+export function useLoadContactGroupSummary() {
+  return useMutation<ContactGroupOnDemandSummaryResponse, Error, { phone: string; groupId: string; limit?: number }>({
+    mutationFn: async ({ phone, groupId, limit = 120 }) => {
+      const res = await fetch(
+        `/api/contacts/${encodeURIComponent(phone)}/group-enrichment/${encodeURIComponent(groupId)}/summary?limit=${limit}`,
+        { credentials: "include" },
+      );
+
+      if (!res.ok) {
         const text = await res.text();
         throw new Error(`${res.status}: ${text || res.statusText}`);
       }

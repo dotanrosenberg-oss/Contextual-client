@@ -13,6 +13,7 @@ import {
   buildContactGroupEnrichment,
   getCachedContactEnrichment,
   setCachedContactEnrichment,
+  summarizeGroupMessages,
 } from "./services/contactGroupEnrichment";
 
 const openai = new OpenAI({
@@ -983,10 +984,9 @@ Respond in JSON format with the following structure:
       const groups = customers.filter((c) => c.id.includes("@g.us"));
 
       const participantsByGroup = new Map<string, Array<{ phone?: string; name?: string }>>();
-      const messagesByGroup = new Map<string, Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>>();
       const normalizedTargetPhone = phone.replace(/[^\d]/g, "");
 
-      // Pull participants for all groups in parallel so this endpoint doesn't hang on large group sets.
+      // Lightweight pass: fetch participants only (no message pull), so load is low by default.
       const participantResults = await Promise.allSettled(
         groups.map(async (group) => {
           const participantsPath = `/api/customers/${encodeURIComponent(group.id)}/participants?includePhotos=false`;
@@ -1007,62 +1007,26 @@ Respond in JSON format with the following structure:
         }),
       );
 
-      const matchedGroupIds: string[] = [];
-
       for (const result of participantResults) {
         if (result.status !== "fulfilled") continue;
         const { groupId, participants } = result.value;
-        participantsByGroup.set(groupId, participants);
 
         const contactIsInGroup = participants.some(
           (p) => (p.phone || "").replace(/[^\d]/g, "") === normalizedTargetPhone,
         );
+
         if (contactIsInGroup) {
-          matchedGroupIds.push(groupId);
+          participantsByGroup.set(groupId, participants);
         }
       }
 
-      // Pull message history only for matched groups (parallel).
-      const messageResults = await Promise.allSettled(
-        matchedGroupIds.map(async (groupId) => {
-          const messagesPath = `/api/customers/${encodeURIComponent(groupId)}/messages?limit=80`;
-          const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", messagesPath);
-
-          if (messagesStatus === 200 && Array.isArray(messagesData)) {
-            return {
-              groupId,
-              messages: messagesData as Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }>,
-            };
-          }
-
-          if (
-            messagesStatus === 200 &&
-            messagesData &&
-            typeof messagesData === "object" &&
-            "messages" in messagesData &&
-            Array.isArray((messagesData as { messages?: unknown }).messages)
-          ) {
-            return {
-              groupId,
-              messages: (messagesData as { messages: Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> }).messages,
-            };
-          }
-
-          return { groupId, messages: [] as Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> };
-        }),
-      );
-
-      for (const result of messageResults) {
-        if (result.status !== "fulfilled") continue;
-        messagesByGroup.set(result.value.groupId, result.value.messages);
-      }
-
+      // No message import by default. Summaries are loaded on-demand per group.
       const payload = buildContactGroupEnrichment({
         contactPhone: phone,
         contactName: contact.name,
         customers,
         participantsByGroup,
-        messagesByGroup,
+        messagesByGroup: new Map(),
       });
 
       setCachedContactEnrichment(cacheKey, payload);
@@ -1070,6 +1034,74 @@ Respond in JSON format with the following structure:
     } catch (error) {
       console.error("Failed to get contact group enrichment:", error);
       res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to retrieve contact group enrichment" });
+    }
+  });
+
+  app.get("/api/contacts/:phone/group-enrichment/:groupId/summary", async (req: Request, res: Response) => {
+    const featureEnabled = process.env.ENABLE_CONTACT_GROUP_ENRICHMENT !== "false";
+    if (!featureEnabled) {
+      return res.status(404).json({
+        error: "FEATURE_DISABLED",
+        message: "Group enrichment is disabled",
+      });
+    }
+
+    try {
+      const { phone, groupId } = req.params;
+      const limitResult = limitQuerySchema.safeParse(req.query.limit);
+      const limit = limitResult.success ? Math.min(limitResult.data, 300) : 120;
+
+      const contact = await storage.getContactByPhone(phone);
+      if (!contact) {
+        return res.status(404).json({ error: "NOT_FOUND", message: "Contact not found" });
+      }
+
+      const participantsPath = `/api/customers/${encodeURIComponent(groupId)}/participants?includePhotos=false`;
+      const { status: participantsStatus, data: participantsData } = await makeWaRequest("GET", participantsPath);
+      if (participantsStatus !== 200 || !participantsData || typeof participantsData !== "object" || !("participants" in participantsData)) {
+        return res.status(502).json({ error: "UPSTREAM_ERROR", message: "Failed to fetch group participants" });
+      }
+
+      const participantsRaw = (participantsData as { participants?: unknown }).participants;
+      const participants = Array.isArray(participantsRaw)
+        ? participantsRaw.filter((p): p is { phone?: string; name?: string } => !!p && typeof p === "object")
+        : [];
+
+      const normalizedTarget = phone.replace(/[^\\d]/g, "");
+      const contactIsInGroup = participants.some((p) => (p.phone || "").replace(/[^\\d]/g, "") === normalizedTarget);
+      if (!contactIsInGroup) {
+        return res.status(403).json({ error: "FORBIDDEN", message: "Contact is not a member of this group" });
+      }
+
+      // On-demand import from upstream WhatsApp history endpoint.
+      const importPath = `/api/whatsapp/messages/${encodeURIComponent(groupId)}?limit=${limit}`;
+      const { status: messagesStatus, data: messagesData } = await makeWaRequest("GET", importPath);
+
+      let messages: Array<{ body?: string; fromName?: string; fromPhone?: string; isFromMe?: boolean; timestamp?: string | number | Date }> = [];
+      if (messagesStatus === 200 && Array.isArray(messagesData)) {
+        messages = messagesData as typeof messages;
+      } else if (
+        messagesStatus === 200 &&
+        messagesData &&
+        typeof messagesData === "object" &&
+        "messages" in messagesData &&
+        Array.isArray((messagesData as { messages?: unknown }).messages)
+      ) {
+        messages = (messagesData as { messages: typeof messages }).messages;
+      } else {
+        return res.status(502).json({ error: "UPSTREAM_ERROR", message: "Failed to import group message history" });
+      }
+
+      const summary = summarizeGroupMessages(messages, phone, contact.name);
+      return res.json({
+        groupId,
+        importedCount: messages.length,
+        generatedAt: new Date().toISOString(),
+        summary,
+      });
+    } catch (error) {
+      console.error("Failed to load on-demand group summary:", error);
+      return res.status(500).json({ error: "INTERNAL_ERROR", message: "Failed to load group summary" });
     }
   });
 

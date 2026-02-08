@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Search, Users, RefreshCw, ArrowLeft, MessageSquareText } from "lucide-react";
 import { Link } from "wouter";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContactAvatar } from "@/components/ContactAvatar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useContactGroupEnrichment } from "@/lib/api";
+import { useContactGroupEnrichment, useLoadContactGroupSummary, type ContactGroupSummary } from "@/lib/api";
 import type { Contact } from "@shared/schema";
 
 function SummaryList({ title, items }: { title: string; items: string[] }) {
@@ -34,6 +34,8 @@ export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [refreshSeed, setRefreshSeed] = useState(0);
+  const [groupSummaries, setGroupSummaries] = useState<Record<string, ContactGroupSummary>>({});
+  const [loadingGroupId, setLoadingGroupId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<{ contacts: Contact[] }>({
@@ -44,6 +46,8 @@ export default function ContactsPage() {
     selectedPhone,
     refreshSeed > 0,
   );
+
+  const loadGroupSummary = useLoadContactGroupSummary();
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -76,6 +80,11 @@ export default function ContactsPage() {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const selectedContact = filteredContacts.find((c) => c.phone === selectedPhone) || contacts.find((c) => c.phone === selectedPhone) || null;
+
+  useEffect(() => {
+    setGroupSummaries({});
+    setLoadingGroupId(null);
+  }, [selectedPhone]);
 
   return (
     <div className="flex h-full">
@@ -198,7 +207,10 @@ export default function ContactsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setRefreshSeed((prev) => prev + 1)}
+                  onClick={() => {
+                    setGroupSummaries({});
+                    setRefreshSeed((prev) => prev + 1);
+                  }}
                   data-testid="button-refresh-group-enrichment"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" /> Refresh
@@ -224,32 +236,71 @@ export default function ContactsPage() {
                   <div className="text-xs text-muted-foreground">
                     {enrichment.groups.length} group{enrichment.groups.length !== 1 ? "s" : ""} • {enrichment.cached ? "Cached" : "Fresh"}
                   </div>
-                  {enrichment.groups.map((group) => (
-                    <div key={group.groupId} className="border rounded-lg p-4 space-y-3" data-testid={`group-summary-${group.groupId}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium">{group.groupName}</p>
+                  {enrichment.groups.map((group) => {
+                    const loadedSummary = groupSummaries[group.groupId];
+                    const activeSummary = loadedSummary ?? group.summary;
+                    const hasLoadedSummary = !!loadedSummary;
+
+                    return (
+                      <div key={group.groupId} className="border rounded-lg p-4 space-y-3" data-testid={`group-summary-${group.groupId}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium">{group.groupName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {group.participantCount ? `${group.participantCount} members` : "Group"}
+                              {activeSummary.lastActivityAt ? ` • Active ${new Date(activeSummary.lastActivityAt).toLocaleDateString()}` : ""}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{activeSummary.mainTopics.length} topics</Badge>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
                           <p className="text-xs text-muted-foreground">
-                            {group.participantCount ? `${group.participantCount} members` : "Group"}
-                            {group.summary.lastActivityAt ? ` • Active ${new Date(group.summary.lastActivityAt).toLocaleDateString()}` : ""}
+                            {hasLoadedSummary ? "Context loaded" : "Context not loaded yet"}
                           </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!selectedPhone || loadingGroupId === group.groupId}
+                            onClick={async () => {
+                              if (!selectedPhone) return;
+                              try {
+                                setLoadingGroupId(group.groupId);
+                                const data = await loadGroupSummary.mutateAsync({
+                                  phone: selectedPhone,
+                                  groupId: group.groupId,
+                                  limit: 160,
+                                });
+                                setGroupSummaries((prev) => ({ ...prev, [group.groupId]: data.summary }));
+                              } catch (err) {
+                                toast({
+                                  title: "Could not load group context",
+                                  description: (err as Error).message,
+                                  variant: "destructive",
+                                });
+                              } finally {
+                                setLoadingGroupId(null);
+                              }
+                            }}
+                          >
+                            {loadingGroupId === group.groupId ? "Loading..." : hasLoadedSummary ? "Reload context" : "Load context"}
+                          </Button>
                         </div>
-                        <Badge variant="secondary">{group.summary.mainTopics.length} topics</Badge>
+
+                        {activeSummary.mainTopics.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {activeSummary.mainTopics.map((topic) => (
+                              <Badge key={`${group.groupId}-${topic}`} variant="outline">{topic}</Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        <SummaryList title="Key decisions" items={activeSummary.keyDecisions} />
+                        <SummaryList title="Open asks / blockers" items={activeSummary.openAsksOrBlockers} />
+                        <SummaryList title="Contact mentions" items={activeSummary.contactMentions} />
                       </div>
-
-                      {group.summary.mainTopics.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {group.summary.mainTopics.map((topic) => (
-                            <Badge key={`${group.groupId}-${topic}`} variant="outline">{topic}</Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      <SummaryList title="Key decisions" items={group.summary.keyDecisions} />
-                      <SummaryList title="Open asks / blockers" items={group.summary.openAsksOrBlockers} />
-                      <SummaryList title="Contact mentions" items={group.summary.contactMentions} />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>
